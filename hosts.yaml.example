@@ -1,0 +1,31 @@
+# Beispiel für hosts.yaml. Zielrechner legt man normalerweise im Reiter „Zielrechner“ an.
+# Passwörter stehen nie hier: Die Oberfläche speichert sie verschlüsselt im Feld „secret“.
+
+targets:
+  - name: srv-linux
+    type: ssh
+    address: 192.0.2.10
+    port: 22
+    username: usvmon
+    options: {sudo: true, host_key: "SHA256:...", key_path: ""}
+
+  - name: srv-windows
+    type: winrm
+    address: 192.0.2.20
+    port: 5986
+    username: usvmon
+    options: {transport: ntlm}
+
+  - name: terra-bmc
+    type: redfish
+    address: 192.0.2.21
+    port: 443
+    username: usvmon
+    options: {system_id: "", cert_fingerprint: "AB:CD:..."}
+
+  - name: xm42
+    type: opcua
+    address: 192.0.2.42
+    port: 4840
+    options: {security: sign_and_encrypt, auth: anonymous, node_id: "ns=2;s=Power.ShutdownRequest",
+              data_type: Boolean, value: "true", verify_write: true}

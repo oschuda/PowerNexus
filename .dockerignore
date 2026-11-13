@@ -1,0 +1,26 @@
+# Nur der Programmcode gehört ins Image; Einstellungen und Daten liegen im Volume
+.git
+.venv
+venv
+**/__pycache__
+.pytest_cache
+tests
+docs/compliance
+dist
+data
+models
+pki
+tls
+*.db
+*.key
+*.pem
+.env
+config.json*
+hosts.yaml
+policies.yaml
+notifications.yaml*
+services.yaml
+solar.yaml
+users.json*
+initial-admin-password.txt
+compose.yaml

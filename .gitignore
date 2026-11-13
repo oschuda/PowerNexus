@@ -1,0 +1,73 @@
+# Evolved PowerNexus .gitignore
+
+# Credentials & Secrets
+.env
+*.env
+!.env.example
+
+# Host & Policy Configurations (user-edited)
+hosts.yaml
+policies.yaml
+config.json
+notifications.yaml*
+services.yaml
+solar.yaml
+!hosts.yaml.example
+!policies.yaml.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+venv/
+env/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ML Models
+*.joblib
+*.pkl
+*.pickle
+*.model
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# OS-specific
+Thumbs.db
+.DS_Store
+
+# Testing
+.tox/
+.pytest_cache/
+coverage.xml
+
+# Schlüssel (privater Signaturschlüssel gehört nie ins Repository) und Laufzeitdaten
+data/
+*.key
+*.pem

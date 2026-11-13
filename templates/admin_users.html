@@ -1,0 +1,185 @@
+﻿<!DOCTYPE html>
+<html lang="{{ lang() }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t('admin.title') }} - Evolved PowerNexus v{{ version }}</title>
+    <script>
+    window.I18N = {{ i18n_json()|safe }};
+    window.T = function (key, params) {
+        var text = window.I18N[key] || key;
+        Object.keys(params || {}).forEach(function (name) { text = text.split('{' + name + '}').join(params[name]); });
+        return text;
+    };
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0e27; color: #e2e8f0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        h1 { font-size: 1.8rem; }
+        .btn { background: #3b82f6; color: white; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn:hover { background: #2563eb; }
+        .btn-red { background: #ef4444; } .btn-red:hover { background: #dc2626; }
+        .btn-green { background: #22c55e; } .btn-green:hover { background: #16a34a; }
+        .btn-sm { padding: 5px 12px; font-size: 0.85rem; }
+        .users-table { background: rgba(15,23,42,0.6); border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: rgba(59,130,246,0.1); padding: 12px; text-align: left; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .role { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; }
+        .role.admin { background: rgba(239,68,68,0.2); color: #fca5a5; }
+        .role.user { background: rgba(59,130,246,0.2); color: #93c5fd; }
+        .role.guest { background: rgba(107,114,128,0.2); color: #d1d5db; }
+        .modal-backdrop { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:100; align-items:center; justify-content:center; }
+        .modal-backdrop.show { display:flex; }
+        .modal { background:#1e293b; border-radius:12px; padding:24px; min-width:350px; border:1px solid rgba(255,255,255,0.1); }
+        .modal h2 { margin-bottom:16px; }
+        .form-group { margin-bottom:12px; }
+        label { display:block; margin-bottom:4px; font-size:0.9rem; color:#94a3b8; }
+        input, select { width:100%; padding:8px 12px; background:#0f172a; border:1px solid rgba(255,255,255,0.15); border-radius:6px; color:white; font-size:0.95rem; }
+        .modal-actions { display:flex; gap:10px; margin-top:16px; justify-content:flex-end; }
+        .alert { padding:10px 14px; border-radius:8px; margin-bottom:14px; display:none; }
+        .alert.success { background:rgba(34,197,94,0.15); border:1px solid #22c55e; color:#86efac; display:block; }
+        .alert.error { background:rgba(239,68,68,0.15); border:1px solid #ef4444; color:#fca5a5; display:block; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>👥 {{ t('admin.title') }}</h1>
+        <div style="display:flex;gap:10px;">
+            <button class="btn btn-green" onclick="openAddModal()">➕ {{ t('admin.add') }}</button>
+            <a href="/" class="btn">← Dashboard</a>
+        </div>
+    </div>
+
+    <div id="alertBox" class="alert"></div>
+
+    <div class="users-table">
+        <table>
+            <thead>
+                <tr><th>{{ t('admin.username') }}</th><th>{{ t('admin.name') }}</th><th>{{ t('admin.role') }}</th><th>{{ t('admin.status') }}</th><th>{{ t('admin.actions') }}</th></tr>
+            </thead>
+            <tbody id="usersBody">
+                {% for user in users %}
+                <tr id="row-{{ user.username }}">
+                    <td><strong>{{ user.username }}</strong></td>
+                    <td>{{ user.name }}</td>
+                    <td><span class="role {{ user.role }}">{{ user.role.upper() }}</span></td>
+                    <td><span style="color:{{ '#22c55e' if user.status == 'online' else '#94a3b8' }}">● {{ user.status }}</span></td>
+                    <td style="display:flex;gap:6px;">
+                        <button class="btn btn-sm" onclick="openEditModal('{{ user.username }}','{{ user.name }}','{{ user.role }}')">✏️ {{ t('common.edit') }}</button>
+                        <button class="btn btn-sm btn-red" onclick="deleteUser('{{ user.username }}')">🗑️ {{ t('common.delete') }}</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Benutzer hinzufügen / bearbeiten -->
+<div class="modal-backdrop" id="userModal">
+    <div class="modal">
+        <h2 id="modalTitle">{{ t('admin.add') }}</h2>
+        <input type="hidden" id="editUsername">
+        <div class="form-group" id="usernameGroup">
+            <label>{{ t('admin.username') }}</label>
+            <input type="text" id="inputUsername" placeholder="{{ t('admin.username_example') }}">
+        </div>
+        <div class="form-group">
+            <label>{{ t('admin.display_name') }}</label>
+            <input type="text" id="inputName" placeholder="{{ t('admin.name_example') }}">
+        </div>
+        <div class="form-group">
+            <label>{{ t('admin.role') }}</label>
+            <select id="inputRole">
+                <option value="admin">Admin</option>
+                <option value="operator">Operator</option>
+                <option value="user" selected>User</option>
+                <option value="guest">Guest</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label id="passwordLabel">{{ t('admin.password') }}</label>
+            <input type="password" id="inputPassword" placeholder="{{ t('admin.password_hint') }}">
+        </div>
+        <div class="modal-actions">
+            <button class="btn" style="background:#475569;" onclick="closeModal()">{{ t('common.cancel') }}</button>
+            <button class="btn btn-green" onclick="saveUser()">💾 {{ t('common.save') }}</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let editMode = false;
+
+function showAlert(msg, type) {
+    const box = document.getElementById('alertBox');
+    box.textContent = msg;
+    box.className = 'alert ' + type;
+    setTimeout(() => { box.className = 'alert'; }, 4000);
+}
+
+function openAddModal() {
+    editMode = false;
+    document.getElementById('modalTitle').textContent = T('admin.add');
+    document.getElementById('usernameGroup').style.display = 'block';
+    document.getElementById('passwordLabel').textContent = T('admin.password');
+    document.getElementById('inputUsername').value = '';
+    document.getElementById('inputName').value = '';
+    document.getElementById('inputRole').value = 'user';
+    document.getElementById('inputPassword').value = '';
+    document.getElementById('userModal').classList.add('show');
+}
+
+function openEditModal(username, name, role) {
+    editMode = true;
+    document.getElementById('modalTitle').textContent = T('admin.edit_title', { name: username });
+    document.getElementById('usernameGroup').style.display = 'none';
+    document.getElementById('passwordLabel').textContent = T('admin.new_password');
+    document.getElementById('editUsername').value = username;
+    document.getElementById('inputName').value = name;
+    document.getElementById('inputRole').value = role;
+    document.getElementById('inputPassword').value = '';
+    document.getElementById('userModal').classList.add('show');
+}
+
+function closeModal() {
+    document.getElementById('userModal').classList.remove('show');
+}
+
+async function saveUser() {
+    const name = document.getElementById('inputName').value.trim();
+    const role = document.getElementById('inputRole').value;
+    const password = document.getElementById('inputPassword').value;
+
+    if (editMode) {
+        const username = document.getElementById('editUsername').value;
+        const body = {username, name, role};
+        if (password) body.password = password;
+        const res = await fetch('/api/admin/user-edit', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+        const data = await res.json();
+        if (res.ok) { showAlert('✅ ' + T('admin.updated'), 'success'); closeModal(); setTimeout(() => location.reload(), 1000); }
+        else showAlert(T('common.error_prefix', { error: data.error }), 'error');
+    } else {
+        const username = document.getElementById('inputUsername').value.trim();
+        if (!username || !password) { showAlert(T('admin.required'), 'error'); return; }
+        const res = await fetch('/api/admin/user-add', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username, name, role, password})});
+        const data = await res.json();
+        if (res.ok) { showAlert('✅ ' + T('admin.created'), 'success'); closeModal(); setTimeout(() => location.reload(), 1000); }
+        else showAlert(T('common.error_prefix', { error: data.error }), 'error');
+    }
+}
+
+async function deleteUser(username) {
+    if (!confirm(T('admin.confirm_delete', { name: username }))) return;
+    const res = await fetch('/api/admin/user-delete', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username})});
+    const data = await res.json();
+    if (res.ok) { showAlert('🗑️ ' + T('admin.deleted'), 'success'); setTimeout(() => location.reload(), 1000); }
+    else showAlert(T('common.error_prefix', { error: data.error }), 'error');
+}
+</script>
+</body>
+</html>

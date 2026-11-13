@@ -1,0 +1,2142 @@
+﻿<!DOCTYPE html>
+<html lang="{{ lang() }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evolved PowerNexus v{{ version }}</title>
+<script>
+window.I18N = {{ i18n_json()|safe }};
+window.LANG = "{{ lang() }}";
+window.T = function (key, params) {
+    var text = window.I18N[key] || key;
+    Object.keys(params || {}).forEach(function (name) { text = text.split('{' + name + '}').join(params[name]); });
+    return text;
+};
+</script>
+<script src="/static/vendor/chart-4.4.9.umd.js"></script>
+<script src="/static/vendor/plotly-2.35.2.min.js"></script>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: #0a0e27;
+        color: #e2e8f0;
+        padding: 20px;
+    }
+    .container { max-width: 1400px; margin: 0 auto; }
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-bottom: 24px;
+    }
+    .header h1 { font-size: 1.5rem; background: linear-gradient(135deg, #60a5fa, #a78bfa); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .header-right {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    .profile-selector {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(255,255,255,0.05);
+        padding: 6px 16px;
+        border-radius: 40px;
+    }
+    .profile-selector select {
+        background: #1e293b;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 20px;
+        cursor: pointer;
+        min-width: 180px;
+    }
+    .btn-add {
+        background: #3b82f6;
+        border: none;
+        color: white;
+        padding: 8px 20px;
+        border-radius: 40px;
+        cursor: pointer;
+        font-size: 0.9rem;
+    }
+    .btn-add:hover { background: #2563eb; }
+    
+    /* User Menu */
+    .user-menu {
+        position: relative;
+    }
+    .btn-user {
+        background: rgba(255,255,255,0.1);
+        border: 1px solid rgba(255,255,255,0.2);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 40px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .btn-user:hover {
+        background: rgba(255,255,255,0.15);
+    }
+    
+    /* Automation Toggle Button */
+    .automation-toggle {
+        background: #22c55e;
+        border: none;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 40px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: bold;
+        transition: all 0.3s ease;
+        white-space: nowrap;
+    }
+    .automation-toggle:hover {
+        background: #16a34a;
+        transform: scale(1.05);
+    }
+    .automation-toggle.paused {
+        background: #ef4444;
+        animation: pulse-red 1.5s ease-in-out infinite;
+    }
+    .automation-toggle.paused:hover {
+        background: #dc2626;
+    }
+    @keyframes pulse-red {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+        50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+    }
+    
+    .user-menu-dropdown {
+        display: none;
+        position: absolute;
+        top: 100%;
+        right: 0;
+        background: #1e293b;
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 12px;
+        min-width: 200px;
+        margin-top: 8px;
+        z-index: 1000;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    .user-menu-dropdown.show {
+        display: block;
+    }
+    .menu-item {
+        display: block;
+        padding: 12px 16px;
+        color: #e2e8f0;
+        text-decoration: none;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .menu-item:first-child {
+        border-top: none;
+    }
+    .menu-item:hover {
+        background: rgba(255,255,255,0.1);
+    }
+    .menu-item.logout {
+        color: #fca5a5;
+    }
+    .menu-item.logout:hover {
+        background: rgba(239, 68, 68, 0.1);
+    }
+    .nav-tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 24px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        padding-bottom: 12px;
+    }
+    .nav-tab {
+        padding: 8px 20px;
+        border-radius: 40px;
+        cursor: pointer;
+        color: #94a3b8;
+    }
+    .nav-tab.active { background: #3b82f6; color: white; }
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+        margin-bottom: 24px;
+    }
+    @media (max-width: 1200px) { .dashboard-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 768px) { .dashboard-grid { grid-template-columns: 1fr; } }
+    .card {
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 20px;
+        border: 1px solid rgba(255,255,255,0.08);
+    }
+    .card h3 {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        color: #94a3b8;
+        margin-bottom: 16px;
+        letter-spacing: 1px;
+    }
+    .value { font-size: 2rem; font-weight: bold; }
+    .value small { font-size: 0.8rem; color: #64748b; }
+    .data-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        font-size: 0.85rem;
+    }
+    .data-label { color: #94a3b8; }
+    .status-online { color: #22c55e; }
+    .status-battery { color: #eab308; }
+    .status-unknown { color: #ef4444; }
+    .runtime-warning {
+        background: #ef4444;
+        color: white;
+        padding: 8px;
+        border-radius: 12px;
+        margin-top: 10px;
+        text-align: center;
+        font-weight: bold;
+        animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+    .chart-container {
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 20px;
+        margin-top: 20px;
+    }
+    .chart-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+        gap: 15px;
+    }
+    .chart-buttons {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .chart-btn {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #94a3b8;
+        padding: 5px 12px;
+        border-radius: 20px;
+        cursor: pointer;
+        font-size: 0.7rem;
+    }
+    .chart-btn.active { background: #3b82f6; color: white; }
+    canvas { max-height: 400px; width: 100% !important; }
+    .footer {
+        text-align: center;
+        margin-top: 20px;
+        padding: 16px;
+        color: #64748b;
+        font-size: 0.7rem;
+    }
+    .loading {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(255,255,255,0.2);
+        border-radius: 50%;
+        border-top-color: #3b82f6;
+        animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===== Mobile Responsive ===== */
+
+    /* Utility class for tab toolbar bars (profile/location selectors) */
+    .tab-toolbar {
+        flex-wrap: wrap;
+    }
+
+    /* Utility class for 2-col form grids that should stack on mobile */
+    .modal-form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
+    @media (max-width: 768px) {
+        body { padding: 10px; }
+        .header h1 { font-size: 1.1rem; }
+        .profile-selector select { min-width: 0; flex: 1; }
+
+        /* Horizontally scrollable nav tabs - no wrapping */
+        .nav-tabs {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            flex-wrap: nowrap;
+            scrollbar-width: none;
+            padding-bottom: 8px;
+        }
+        .nav-tabs::-webkit-scrollbar { display: none; }
+        .nav-tab {
+            white-space: nowrap;
+            flex-shrink: 0;
+            padding: 7px 14px;
+            font-size: 0.85rem;
+        }
+
+        canvas { max-height: 280px !important; }
+        #historyChart,
+        #gridTrendChart,
+        #solarChart,
+        #solarCorrChart { min-height: 220px !important; }
+    }
+
+    @media (max-width: 480px) {
+        body { padding: 8px; }
+
+        /* Stack header on small phones */
+        .header { flex-direction: column; align-items: flex-start; }
+        .header-right { width: 100%; flex-wrap: wrap; }
+        .profile-selector { width: 100%; flex-wrap: wrap; }
+        .profile-selector select { flex: 1; min-width: 0; }
+
+        .value { font-size: 1.5rem; }
+        canvas { max-height: 200px !important; }
+
+        /* Tab toolbar: stack label + select + button vertically */
+        .tab-toolbar { flex-direction: column; align-items: flex-start !important; }
+        .tab-toolbar select { width: 100%; }
+
+        /* Profile modal form: 1 column */
+        .modal-form-grid { grid-template-columns: 1fr; }
+    }
+</style>
+<style>
+    .auto-lang { background:#1e293b; color:white; border:1px solid rgba(255,255,255,0.15); padding:6px 8px; border-radius:8px; }
+    .dry-run-toggle { background:#334155; color:#e2e8f0; border:1px solid rgba(255,255,255,0.2); padding:8px 14px; border-radius:20px; cursor:pointer; font-weight:600; }
+    .dry-run-toggle.dry-run-on { background:#f59e0b; color:#111827; border-color:#f59e0b; }
+    .dry-run-toggle:disabled { opacity:0.8; cursor:not-allowed; }
+    .dry-run-banner { background:#f59e0b; color:#111827; text-align:center; font-weight:700; padding:8px; border-radius:10px; margin-bottom:14px; }
+    .auto-card h3 { margin-bottom:6px; }
+    .auto-card.auto-off { opacity:0.65; }
+    .auto-sub { color:#94a3b8; font-size:0.85rem; margin:4px 0; }
+    .auto-badges { margin:8px 0; }
+    .auto-badge { display:inline-block; padding:2px 10px; border-radius:12px; font-size:0.78rem; font-weight:600; }
+    .auto-badge.ok { background:#22c55e22; color:#4ade80; border:1px solid #22c55e55; }
+    .auto-badge.warn { background:#f59e0b22; color:#fbbf24; border:1px solid #f59e0b55; }
+    .auto-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+    .auto-danger { background:#7f1d1d !important; color:#fecaca !important; }
+    .auto-primary { background:#3b82f6 !important; color:white !important; }
+    .auto-empty { text-align:center; padding:30px; color:#94a3b8; grid-column:1/-1; }
+    .auto-steps { margin:6px 0 6px 18px; font-size:0.85rem; color:#cbd5e1; }
+    .auto-result { margin-top:10px; font-size:0.85rem; }
+    .auto-result code, .auto-steps code, .auto-sub code { font-size:0.78rem; color:#93c5fd; word-break:break-all; }
+    .auto-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+    .auto-table th, .auto-table td { text-align:left; padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.08); }
+    .auto-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; z-index:2000; }
+    .auto-window { background:#0f172a; border:1px solid rgba(255,255,255,0.12); border-radius:14px; width:min(760px, 94vw); max-height:90vh; display:flex; flex-direction:column; }
+    .auto-window-head { display:flex; justify-content:space-between; align-items:center; padding:14px 18px; border-bottom:1px solid rgba(255,255,255,0.08); }
+    .auto-window-body { padding:14px 18px; overflow-y:auto; }
+    .auto-window-foot { display:flex; gap:8px; justify-content:flex-end; padding:12px 18px; border-top:1px solid rgba(255,255,255,0.08); }
+    #mailForm a, #servicesForm a, .auto-window-body a { color:#93c5fd; }
+    .auto-countdown { background:#7c2d12; color:#ffedd5; border:1px solid #ea580c; border-radius:10px; padding:10px 14px; margin:10px 0; }
+    .auto-countdown-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:4px 0; }
+    .auto-field { display:block; margin:8px 0; }
+    .auto-field span { display:block; font-size:0.85rem; color:#94a3b8; margin-bottom:3px; }
+    .auto-field input, .auto-field select, .auto-field textarea { width:100%; padding:8px; background:#1e293b; border:1px solid rgba(255,255,255,0.15); border-radius:6px; color:white; }
+    .auto-check { display:inline-flex; align-items:center; gap:6px; margin:4px 14px 4px 0; font-size:0.9rem; }
+    .auto-checks { display:flex; flex-wrap:wrap; }
+    .auto-step { border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:10px 12px; margin:10px 0; }
+    .auto-step legend { padding:0 6px; color:#93c5fd; }
+    .auto-window-body h4 { margin:16px 0 6px; color:#e2e8f0; }
+    #autoHelpBody table { border-collapse:collapse; margin:8px 0; font-size:0.85rem; }
+    #autoHelpBody th, #autoHelpBody td { border:1px solid rgba(255,255,255,0.12); padding:4px 8px; text-align:left; }
+    #autoHelpBody pre { background:#1e293b; padding:10px; border-radius:8px; overflow-x:auto; }
+    #autoHelpBody h1, #autoHelpBody h2, #autoHelpBody h3 { margin:14px 0 6px; }
+    #autoHelpBody a { color:#93c5fd; }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🔋 Evolved PowerNexus <small>v{{ version }}</small></h1>
+        <div class="header-right">
+            <div class="profile-selector">
+                <label>📡 {{ t('header.ups') }}</label>
+                <select id="profileSelect" onchange="switchProfile()"></select>
+            </div>
+            <button id="btnAddProfileHeader" class="btn-add" onclick="openProfileModal(null)">{{ t('header.add_profile') }}</button>
+            <select id="languageSelect" class="auto-lang" onchange="setLanguage(this.value)" title="{{ t('lang.label') }}">
+                <option value="de">DE</option>
+                <option value="en">EN</option>
+            </select>
+            <button id="dryRunToggle" class="dry-run-toggle" onclick="toggleDryRun()">{{ t('dryrun.button_off') }}</button>
+            <button id="automationToggle" class="automation-toggle" onclick="toggleAutomation()" title="{{ t('auto.title') }}">{{ t('auto.active') }}</button>
+            <div class="user-menu">
+                <button class="btn-user" onclick="toggleUserMenu()">👤 <span id="username">{{ t('header.user') }}</span></button>
+                <div id="userMenuDropdown" class="user-menu-dropdown">
+                    <a id="linkUserMgmt" href="/admin/users" class="menu-item">👥 {{ t('menu.users') }}</a>
+                    <a href="/account/password" class="menu-item">🔑 {{ t('menu.password') }}</a>
+                    <a href="#" class="menu-item" onclick="syncDatabase(event)">💾 {{ t('menu.db_sync') }}</a>
+                    <a href="/api/session" class="menu-item">ℹ️ {{ t('menu.session') }}</a>
+                    <hr style="margin: 8px 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <a href="/logout" class="menu-item logout">🚪 {{ t('menu.logout') }}</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="dryRunBanner" class="dry-run-banner" style="display:none;">🧪 {{ t('dryrun.banner') }}</div>
+    <div id="autoCountdown" class="auto-countdown" style="display:none;"></div>
+    <div id="noProfileHint" class="auto-countdown" style="display:none;">{{ t('dash.no_profile') }}</div>
+    
+    <div class="nav-tabs">
+        <div class="nav-tab active" onclick="showTab('dashboard')">📊 {{ t('tab.dashboard') }}</div>
+        <div class="nav-tab" onclick="showTab('history')">📈 {{ t('tab.history') }}</div>
+        <div class="nav-tab" onclick="showTab('battery')">🔋 {{ t('tab.battery') }}</div>
+        <div class="nav-tab" onclick="showTab('battery-predict')">🤖 {{ t('tab.prediction') }}</div>
+        <div class="nav-tab" onclick="showTab('grid-quality')">🌐 {{ t('tab.grid') }}</div>
+        <div class="nav-tab" onclick="showTab('solar')">☀️ {{ t('tab.solar') }}</div>
+        <div class="nav-tab" onclick="showTab('events')">📋 {{ t('tab.events') }}</div>
+        <div class="nav-tab" onclick="showTab('policies')">⚙️ {{ t('tab.policies') }}</div>
+        <div class="nav-tab" onclick="showTab('hosts')">🖥️ {{ t('tab.targets') }}</div>
+        <div class="nav-tab" onclick="showTab('mail')">✉️ {{ t('mail.title') }}</div>
+        <div class="nav-tab" onclick="showTab('services')">🔌 {{ t('services.title') }}</div>
+        <div class="nav-tab" onclick="showTab('groups')">👥 {{ t('tab.groups') }}</div>
+        <div class="nav-tab" onclick="showTab('help')">❓ {{ t('tab.help') }}</div>
+        <div class="nav-tab" onclick="showTab('settings')" id="adminTab" style="display:none;">⚙️ {{ t('tab.settings') }}</div>
+    </div>
+    
+    <div id="tab-dashboard" class="tab-content">
+        <div class="dashboard-grid">
+            <div class="card">
+                <h3>📡 {{ t('dash.system') }}</h3>
+                <div class="value" id="statusValue">--</div>
+                <div class="data-row"><span class="data-label">{{ t('dash.model') }}</span><span id="model">--</span></div>
+                <div class="data-row"><span class="data-label">{{ t('dash.serial') }}</span><span id="serial">--</span></div>
+                <div class="data-row"><span class="data-label">{{ t('dash.connection') }}</span><span id="connectionType">--</span></div>
+                <div class="data-row"><span class="data-label">{{ t('dash.updated') }}</span><span id="lastUpdate">--</span></div>
+            </div>
+            <div class="card">
+                <h3>🔋 {{ t('tab.battery') }}</h3>
+                <div class="value" id="batteryCharge">--<small>%</small></div>
+                <div class="data-row"><span class="data-label">{{ t('dash.runtime') }}</span><span id="runtime">-- min</span></div>
+                <div class="data-row"><span class="data-label">{{ t('dash.temperature') }}</span><span id="temperature">-- °C</span></div>
+                <div class="data-row"><span class="data-label">{{ t('dash.voltage') }}</span><span id="batteryVoltage">-- V</span></div>
+                <div id="runtimeWarning" style="display:none;" class="runtime-warning">⚠️ {{ t('dash.no_runtime') }}</div>
+                <div id="batteryReplaceWarning" style="display:none; margin-top:10px; padding:10px; background:#fef3c7; border:1px solid #f59e0b; border-radius:5px; color:#92400e;">
+                    <strong>🔴 {{ t('dash.replace') }}</strong><br>
+                    {{ t('dash.replace_detail') }}
+                </div>
+            </div>
+            <div class="card">
+                <h3>⚡ {{ t('dash.power') }}</h3>
+                <div class="value" id="powerStatus">--</div>
+                <div class="data-row"><span class="data-label">{{ t('dash.input') }}</span><span id="inputInfo">-- V / -- A</span></div>
+                <div class="data-row"><span class="data-label">{{ t('dash.output') }}</span><span id="outputInfo">-- V / -- A</span></div>
+                <div class="data-row"><span class="data-label">{{ t('dash.load') }}</span><span id="load">-- %</span></div>
+                <div class="data-row"><span class="data-label">{{ t('dash.power') }}</span><span id="powerInfo">-- W / -- VA</span></div>
+            </div>
+            <div class="card">
+                <h3>⚠️ {{ t('dash.warnings') }}</h3>
+                <div id="warnings">{{ t('dash.no_warnings') }}</div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="tab-history" class="tab-content" style="display:none;">
+        <div class="chart-container">
+            <div class="chart-header">
+                <h3>📈 {{ t('hist.title') }}</h3>
+                <select id="historyProfileSelect" onchange="loadHistory()" style="background:#1e293b;color:white;border:1px solid rgba(255,255,255,0.15);padding:6px 10px;border-radius:8px;font-size:0.9rem;min-width:220px;">
+                    <option value="">{{ t('hist.active_ups') }}</option>
+                </select>
+                <div class="chart-buttons">
+                    <button class="chart-btn" data-days="1">24h</button>
+                    <button class="chart-btn active" data-days="7">7d</button>
+                    <button class="chart-btn" data-days="30">30d</button>
+                    <button class="chart-btn" data-days="90">90d</button>
+                </div>
+            </div>
+            <div class="chart-controls">
+                <label><input type="checkbox" id="showCharge" checked> 🔋 {{ t('hist.charge') }}</label>
+                <label><input type="checkbox" id="showRuntime" checked> ⏱️ {{ t('hist.runtime') }}</label>
+                <label><input type="checkbox" id="showInput"> 📥 {{ t('hist.input') }}</label>
+                <label><input type="checkbox" id="showOutput"> 📤 {{ t('hist.output') }}</label>
+                <label><input type="checkbox" id="showLoad"> ⚡ {{ t('hist.load') }}</label>
+                <label><input type="checkbox" id="showTemp"> 🌡️ {{ t('hist.temperature') }}</label>
+            </div>
+            <div id="historyChart" style="min-height:360px;"></div>
+            <div class="footer" id="chartInfo"></div>
+        </div>
+    </div>
+
+    <!-- Battery Health Tab -->
+    <!-- Battery Status Tab (v20.1.1 REPARATUR) -->
+    <div id="tab-battery" class="tab-content" style="display:none;">
+        <div class="tab-toolbar" style="display:flex;align-items:center;gap:14px;margin-bottom:20px;background:rgba(15,23,42,0.6);padding:14px 20px;border-radius:14px;border:1px solid rgba(255,255,255,0.08);">
+            <label style="color:#94a3b8;font-size:0.9rem;white-space:nowrap;">📍 {{ t('bat.select') }}</label>
+            <select id="batteryProfileSelect" onchange="loadBatteryStatus()" style="background:#1e293b;color:white;border:1px solid rgba(255,255,255,0.15);padding:7px 12px;border-radius:8px;font-size:0.9rem;min-width:220px;">
+                <option value="">{{ t('hist.active_ups') }}</option>
+            </select>
+            <button onclick="loadBatteryStatus()" style="background:#3b82f6;color:white;border:none;padding:7px 16px;border-radius:8px;cursor:pointer;font-size:0.9rem;">🔄 {{ t('common.refresh') }}</button>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="card">
+                <h3>🔋 {{ t('bat.status') }}</h3>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div>
+                        <div style="color:#94a3b8;font-size:0.85rem;margin-bottom:4px;">{{ t('bat.charge') }}</div>
+                        <div class="value" id="batTabCharge">--%</div>
+                    </div>
+                    <div>
+                        <div style="color:#94a3b8;font-size:0.85rem;margin-bottom:4px;">{{ t('dash.temperature') }}</div>
+                        <div class="value" id="batteryTemp">--°C</div>
+                    </div>
+                </div>
+
+                <div style="margin-top:16px;padding:12px;background:rgba(100,150,200,0.1);border-left:3px solid #60a5fa;border-radius:4px;">
+                    <div class="data-row"><span class="data-label">{{ t('dash.voltage') }}</span><span id="batTabVoltage">-- V</span></div>
+                    <div class="data-row"><span class="data-label">{{ t('dash.runtime') }}</span><span id="batteryRuntime">-- min</span></div>
+                    <div class="data-row"><span class="data-label">{{ t('bat.system_status') }}</span><span id="batteryStatus">--</span></div>
+                    <div class="data-row"><span class="data-label">{{ t('bat.load') }}</span><span id="batteryLoad">-- %</span></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>🔧 {{ t('bat.aging') }}</h3>
+                <div style="margin:8px 0 14px;">
+                    <label class="auto-field"><span>{{ t('battery.installed.label') }}</span>
+                        <input id="batInstalled" type="date"></label>
+                    <div class="auto-actions">
+                        <button class="chart-btn auto-primary" type="button" id="batInstalledSave">{{ t('common.save') }}</button>
+                        <button class="chart-btn" type="button" id="batInstalledToday">{{ t('battery.installed.today') }}</button>
+                    </div>
+                    <div class="auto-sub" id="batInstalledHint"></div>
+                    <div class="auto-result" id="batInstalledResult"></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+                    <div>
+                        <div style="color:#94a3b8;font-size:0.85rem;margin-bottom:4px;">{{ t('bat.uses') }}</div>
+                        <div class="value" style="font-size:1.8rem;" id="batteryCycles">--</div>
+                    </div>
+                    <div>
+                        <div style="color:#94a3b8;font-size:0.85rem;margin-bottom:4px;">{{ t('bat.last_use') }}</div>
+                        <div class="value" style="font-size:1.1rem;" id="batteryLastEvent">--</div>
+                    </div>
+                </div>
+
+                <div style="padding:12px;background:rgba(200,100,100,0.1);border-left:3px solid #f97316;border-radius:4px;">
+                    <div class="data-row"><span class="data-label">{{ t('bat.condition') }}</span><span id="batteryRisk">--</span></div>
+                    <div class="data-row"><span class="data-label">{{ t('bat.lifetime') }}</span><span id="batteryLifespan">--</span></div>
+                    <div class="data-row"><span class="data-label">{{ t('bat.quality') }}</span><span id="batteryDataQuality">--</span></div>
+                    <div class="data-row"><span class="data-label">{{ t('bat.overall') }}</span><span id="batteryWarning" style="color:#f97316;font-weight:600;">--</span></div>
+                </div>
+                <div id="batteryRecommendation" style="margin-top:12px;font-size:0.85rem;line-height:1.5;color:#94a3b8;"></div>
+            </div>
+        </div>
+
+        <div class="chart-container" style="margin-top:20px;">
+            <div class="chart-header">
+                <h3>💡 {{ t('bat.info') }}</h3>
+            </div>
+            <div id="batteryInfo" style="background:#1e293b;padding:16px;border-radius:8px;color:#e2e8f0;">
+                <p style="font-size:0.9rem;line-height:1.6;">
+                    • <strong>{{ t('bat.condition') }}:</strong> {{ t('bat.info.condition') }}<br>
+                    • <strong>{{ t('bat.lifetime') }}:</strong> {{ t('bat.info.lifetime') }}<br>
+                    • <strong>{{ t('bat.quality') }}:</strong> {{ t('bat.info.quality') }}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Battery ML Prediction Tab -->
+    <div id="tab-battery-predict" class="tab-content" style="display:none;">
+        <!-- Profil-Auswahl -->
+        <div class="tab-toolbar" style="display:flex;align-items:center;gap:14px;margin-bottom:20px;background:rgba(15,23,42,0.6);padding:14px 20px;border-radius:14px;border:1px solid rgba(255,255,255,0.08);">
+            <label style="color:#94a3b8;font-size:0.9rem;white-space:nowrap;">🔋 {{ t('pred.profile') }}</label>
+            <select id="mlProfileSelect" onchange="loadBatteryPredict()" style="background:#1e293b;color:white;border:1px solid rgba(255,255,255,0.15);padding:7px 12px;border-radius:8px;font-size:0.9rem;min-width:220px;">
+                <option value="">{{ t('pred.active_profile') }}</option>
+            </select>
+            <button onclick="loadBatteryPredict()" style="background:#8b5cf6;color:white;border:none;padding:7px 16px;border-radius:8px;cursor:pointer;font-size:0.9rem;">🔄 {{ t('common.refresh') }}</button>
+            <span id="mlMethodBadge" style="display:none;padding:4px 12px;border-radius:20px;font-size:0.75rem;font-weight:600;"></span>
+        </div>
+
+        <div class="dashboard-grid">
+            <!-- Gauge: Restlebensdauer -->
+            <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                <h3>📅 {{ t('bat.lifetime') }}</h3>
+                <div style="position:relative;width:180px;height:180px;margin:10px auto;">
+                    <canvas id="mlGaugeChart" width="180" height="180"></canvas>
+                    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-40%);text-align:center;">
+                        <div id="mlDaysValue" style="font-size:2.4rem;font-weight:bold;">--</div>
+                        <div style="font-size:0.75rem;color:#94a3b8;">{{ t('pred.months') }}</div>
+                    </div>
+                </div>
+                <div id="mlRiskBadge" style="padding:6px 20px;border-radius:20px;font-size:0.9rem;font-weight:600;margin-top:6px;text-align:center;">--</div>
+                <div id="mlLifetimeBasis" style="font-size:0.75rem;color:#94a3b8;margin-top:8px;text-align:center;"></div>
+            </div>
+
+            <!-- Konfidenz & Details -->
+            <div class="card">
+                <h3>📊 {{ t('pred.assessment') }}</h3>
+                <div class="data-row"><span class="data-label">{{ t('bat.condition') }}</span><span id="mlCondition" style="font-weight:600;">--</span></div>
+                <div class="data-row">
+                    <span class="data-label">{{ t('bat.quality') }}</span>
+                    <div style="flex:1;margin-left:10px;">
+                        <div id="mlConfidenceBar" style="height:8px;border-radius:4px;background:rgba(255,255,255,0.1);overflow:hidden;">
+                            <div id="mlConfidenceFill" style="height:100%;width:0%;background:#8b5cf6;border-radius:4px;transition:width 0.6s;"></div>
+                        </div>
+                        <div style="font-size:0.8rem;color:#94a3b8;margin-top:4px;"><span id="mlConfidenceValue">--</span></div>
+                    </div>
+                </div>
+                <div class="data-row"><span class="data-label">{{ t('pred.trend') }}</span><span id="mlDegradationRate" style="text-align:right;">--</span></div>
+                <div class="data-row"><span class="data-label">{{ t('pred.computed') }}</span><span id="mlTimestamp" style="font-size:0.8rem;">--</span></div>
+                <div id="mlNote" style="margin-top:10px;padding:8px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:8px;font-size:0.8rem;color:#fbbf24;display:none;"></div>
+            </div>
+
+            <!-- Empfehlung -->
+            <div class="card">
+                <h3>💡 {{ t('pred.findings') }}</h3>
+                <div id="mlRecommendation" style="font-size:0.95rem;line-height:1.7;color:#e2e8f0;padding:8px 0;">--</div>
+            </div>
+
+            <!-- Alle Profile Übersicht -->
+            <div class="card">
+                <h3>🗂️ {{ t('pred.overview') }}</h3>
+                <div id="mlOverviewList" style="font-size:0.85rem;">{{ t('common.loading_short') }}</div>
+            </div>
+        </div>
+
+        <!-- Feature Importance Chart -->
+        <div id="mlImportanceContainer" class="chart-container" style="margin-top:20px;display:none;">
+            <div class="chart-header">
+                <h3>🔍 {{ t('pred.importance') }}</h3>
+                <div id="mlChartInfo" style="font-size:0.8rem;color:#94a3b8;"></div>
+            </div>
+            <canvas id="mlImportanceChart" style="max-height:260px;"></canvas>
+        </div>
+    </div>
+
+    <!-- Grid Quality Tab -->
+    <div id="tab-grid-quality" class="tab-content" style="display:none;">
+        <!-- Standort-Auswahl -->
+        <div class="tab-toolbar" style="display:flex;align-items:center;gap:14px;margin-bottom:20px;background:rgba(15,23,42,0.6);padding:14px 20px;border-radius:14px;border:1px solid rgba(255,255,255,0.08);">
+            <label style="color:#94a3b8;font-size:0.9rem;white-space:nowrap;">📍 {{ t('grid.location') }}</label>
+            <select id="gridLocationSelect" onchange="loadGridQuality()" style="background:#1e293b;color:white;border:1px solid rgba(255,255,255,0.15);padding:7px 12px;border-radius:8px;font-size:0.9rem;min-width:220px;">
+                <option value="">{{ t('pred.active_profile') }}</option>
+            </select>
+            <button onclick="loadGridQuality()" style="background:#3b82f6;color:white;border:none;padding:7px 16px;border-radius:8px;cursor:pointer;font-size:0.9rem;">🔄 {{ t('common.refresh') }}</button>
+            <span id="gridLocationBadge" style="display:none;padding:4px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;"></span>
+        </div>
+
+        <div class="dashboard-grid">
+            <!-- Score-Gauge -->
+            <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                <h3>📊 {{ t('grid.score') }}</h3>
+                <div style="position:relative;width:160px;height:160px;margin:10px auto;">
+                    <canvas id="gridGaugeChart" width="160" height="160"></canvas>
+                    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-40%);text-align:center;">
+                        <div id="gridScoreValue" style="font-size:2.2rem;font-weight:bold;">--</div>
+                        <div style="font-size:0.75rem;color:#94a3b8;">/ 100</div>
+                    </div>
+                </div>
+                <div id="gridStatusBadge" style="padding:5px 18px;border-radius:20px;font-size:0.9rem;font-weight:600;margin-top:6px;">--</div>
+                <div id="gridRecommendation" style="margin-top:10px;font-size:0.8rem;color:#94a3b8;text-align:center;padding:0 8px;"></div>
+            </div>
+
+            <!-- Frequenz -->
+            <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <h3>🔁 {{ t('grid.frequency') }}</h3>
+                    <span class="help-icon" onmouseover="showHelpTooltip('frequency', event)" onmouseout="hideHelpTooltip()" title="{{ t('grid.tip.frequency') }}">ℹ️</span>
+                </div>
+                <div class="value" id="gridFrequency">-- <small>Hz</small></div>
+                <div class="data-row"><span class="data-label">{{ t('grid.target') }}</span><span>50.0 Hz</span></div>
+                <div class="data-row"><span class="data-label">{{ t('grid.deviation') }}</span><span id="gridFreqDeviation">-- Hz</span></div>
+                <div class="data-row"><span class="data-label">{{ t('grid.trend') }}</span><span id="gridFreqTrend">--</span></div>
+                <div class="data-row"><span class="data-label">{{ t('grid.status') }}</span><span id="gridFreqStatus">--</span></div>
+            </div>
+
+            <!-- Spannung -->
+            <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <h3>⚡ {{ t('grid.input_voltage') }}</h3>
+                    <span class="help-icon" onmouseover="showHelpTooltip('voltage_sag', event)" onmouseout="hideHelpTooltip()" title="{{ t('grid.tip.voltage') }}">ℹ️</span>
+                </div>
+                <div class="value" id="gridVoltage">-- <small>V</small></div>
+                <div class="data-row"><span class="data-label">{{ t('grid.target') }}</span><span>230 V</span></div>
+                <div class="data-row"><span class="data-label">{{ t('grid.variance') }}</span><span id="gridVoltVariance">-- V</span></div>
+                <div class="data-row"><span class="data-label">{{ t('grid.unbalance') }}</span><span id="gridVoltUnbalance">-- %</span></div>
+                <div class="data-row"><span class="data-label">{{ t('grid.status') }}</span><span id="gridVoltStatus">--</span></div>
+            </div>
+
+            <!-- Störungen -->
+            <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <h3>📉 {{ t('grid.disturbances') }}</h3>
+                    <span class="help-icon" onmouseover="showHelpTooltip('thd', event)" onmouseout="hideHelpTooltip()" title="{{ t('grid.tip.events') }}">ℹ️</span>
+                </div>
+                <div class="data-row"><span class="data-label">{{ t('grid.flutter') }}</span><span id="gridFlutterStatus">--</span></div>
+                <div class="data-row"><span class="data-label">{{ t('grid.risk') }}</span><span id="gridFlutterRisk">--</span></div>
+                <div id="gridIssuesList" style="margin-top:12px;font-size:0.85rem;"></div>
+            </div>
+        </div>
+
+        <!-- Trendchart -->
+        <div class="chart-container" style="margin-top:20px;">
+            <div class="chart-header">
+                <h3>📈 {{ t('grid.history') }}</h3>
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div id="gridChartInfo" style="font-size:0.8rem;color:#94a3b8;"></div>
+                    <select id="gridHistoryDays" onchange="_renderGridTrendChart()" style="background:#1e293b;color:white;border:1px solid rgba(255,255,255,0.15);padding:4px 8px;border-radius:6px;font-size:0.85rem;">
+                        <option value="1">24 h</option>
+                        <option value="7">{{ t('grid.days7') }}</option>
+                        <option value="30">{{ t('grid.days30') }}</option>
+                    </select>
+                </div>
+            </div>
+            <div id="gridTrendChart" style="min-height:300px;"></div>
+        </div>
+    </div>
+
+    <!-- Tab: Meldungen (Events) Phase 5.5 -->
+    <div id="tab-events" class="tab-content" style="display:none;">
+        <div class="chart-container">
+            <div class="chart-header">
+                <h3>📋 {{ t('ev.title') }}</h3>
+                <div class="chart-buttons">
+                    <input type="number" id="eventsHours" value="24" min="1" max="720" style="width:60px; padding:5px; background:#1e293b; color:white; border:1px solid rgba(255,255,255,0.1); border-radius:8px;" placeholder="{{ t('ev.hours') }}">
+                    <button class="chart-btn" onclick="loadEvents()">🔄 {{ t('common.refresh') }}</button>
+                </div>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="eventsTable" class="data-table">
+                    <thead>
+                        <tr>
+                            <th>{{ t('ev.time') }}</th>
+                            <th>{{ t('ev.type') }}</th>
+                            <th>{{ t('ev.ups') }}</th>
+                            <th>{{ t('ev.severity') }}</th>
+                            <th>{{ t('ev.source') }}</th>
+                            <th>{{ t('ev.details') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody id="eventsTableBody">
+                        <tr><td colspan="6" class="text-center">{{ t('ev.loading') }}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="activeEventsWidget" style="margin-top: 20px; display:none;">
+                <h3>🔴 {{ t('ev.active') }}</h3>
+                <div id="activeEventsList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-top: 12px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Regeln (Policies) Phase 5.5 -->
+    <div id="tab-policies" class="tab-content" style="display:none;">
+        <div class="chart-container">
+            <div class="chart-header">
+                <h3>⚙️ {{ t('policies.title') }}</h3>
+                <button class="chart-btn" onclick="AutoPolicyForm.open(null)" style="background:#10b981;color:white;border:none;cursor:pointer;">{{ t('policies.add') }}</button>
+            </div>
+            <div id="policiesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;"></div>
+        </div>
+        <div class="chart-container" style="margin-top:20px;">
+            <div class="chart-header"><h3>⏱️ {{ t('policies.runs_title') }}</h3></div>
+            <div id="policyRuns"></div>
+        </div>
+    </div>
+
+    <!-- Tab: Zielrechner (Hosts) Phase 5.5 -->
+    <div id="tab-hosts" class="tab-content" style="display:none;">
+        <div class="chart-container">
+            <div class="chart-header">
+                <h3>🖥️ {{ t('targets.title') }}</h3>
+                <button class="chart-btn" onclick="AutoTargets.open(null)" style="background:#10b981;color:white;border:none;cursor:pointer;">{{ t('targets.add') }}</button>
+            </div>
+            <div id="hostsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;"></div>
+        </div>
+    </div>
+
+    <!-- Tab: E-Mail (auto-mail.js) -->
+    <div id="tab-mail" class="tab-content" style="display:none;">
+        <div class="chart-container">
+            <div class="chart-header"><h3>✉️ {{ t('mail.title') }}</h3></div>
+            <div id="mailForm"></div>
+        </div>
+    </div>
+
+    <!-- Tab: PV-Wechselrichter (solar.js) -->
+    <div id="tab-solar" class="tab-content" style="display:none;">
+        <div class="chart-header">
+            <div id="solarStatus"></div>
+            <div class="chart-buttons" id="solarDays">
+                <button class="chart-btn active" type="button" data-days="1">24 h</button>
+                <button class="chart-btn" type="button" data-days="7">{{ t('chart.days', days=7) }}</button>
+                <button class="chart-btn" type="button" data-days="30">{{ t('chart.days', days=30) }}</button>
+                <button class="chart-btn" type="button" data-days="365">{{ t('chart.days', days=365) }}</button>
+                <button class="chart-btn" type="button" id="solarRefresh">🔄 {{ t('common.refresh') }}</button>
+            </div>
+        </div>
+        <div class="dashboard-grid" id="solarCards"></div>
+        <div class="chart-container">
+            <div class="chart-header"><h3>📈 {{ t('solar.chart.title') }}</h3><span id="solarChartInfo" class="auto-sub"></span></div>
+            <div id="solarChart" style="min-height:300px;"></div>
+        </div>
+        <div class="chart-container">
+            <div class="chart-header">
+                <h3>🔗 {{ t('solar.corr.title') }}</h3>
+                <select id="solarUpsSelect" style="background:#1e293b;color:white;border:1px solid rgba(255,255,255,0.15);padding:7px 12px;border-radius:8px;">
+                    <option value="">{{ t('solar.corr.default_ups') }}</option>
+                </select>
+            </div>
+            <div class="auto-sub">{{ t('solar.corr.hint') }}</div>
+            <div id="solarCorrChart" style="min-height:300px;"></div>
+            <div id="solarCorrInfo" class="auto-sub"></div>
+        </div>
+        <div class="chart-container">
+            <div class="chart-header"><h3>📋 {{ t('solar.events.title') }}</h3></div>
+            <div id="solarEvents"></div>
+        </div>
+        <div class="chart-container" id="solarSettingsBox" style="display:none;">
+            <div class="chart-header"><h3>📡 {{ t('solar.settings.title') }}</h3></div>
+            <div id="solarForm"></div>
+        </div>
+    </div>
+
+    <!-- Tab: Dienste (auto-services.js) -->
+    <div id="tab-services" class="tab-content" style="display:none;">
+        <div class="chart-container">
+            <div class="chart-header"><h3>🔌 {{ t('services.title') }}</h3></div>
+            <div id="servicesForm"></div>
+        </div>
+    </div>
+
+    <!-- Groups Tab (Phase 5.6) -->
+    <div id="tab-groups" class="tab-content" style="display:none;">
+        <div class="chart-container">
+            <div class="chart-header">
+                <h3>👥 {{ t('tab.groups') }}</h3>
+                <button class="chart-btn" onclick="openGroupModal(null)" style="background: #a855f7; color: white; border: none; cursor: pointer;">{{ t('group.add') }}</button>
+            </div>
+            <div id="groupsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
+                <div class="card" style="text-align: center; padding: 40px;">
+                    <div class="loading"></div>
+                    <p style="margin-top: 12px; color: #94a3b8;">{{ t('group.loading') }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help & Documentation Tab -->
+    <div id="tab-help" class="tab-content" style="display:none;">
+        <div class="help-container">
+            <div class="help-header">
+                <h2>📚 {{ t('help.title') }}</h2>
+                <p class="help-subtitle">{{ t('help.subtitle') }}</p>
+            </div>
+
+            <div class="accordion-section">
+                <div class="accordion-header" onclick="toggleAccordion(this)">
+                    <span class="accordion-icon">▶</span>
+                    <h3>🤖 {{ t('help.automation.title') }}</h3>
+                </div>
+                <div class="accordion-content" style="display:none;">
+                    <div class="help-content">
+                        <ul>
+                            <li><a href="#" data-help="automation">{{ t('help.page.automation') }}</a></li>
+                            <li><a href="#" data-help="dry-run">{{ t('help.page.dry-run') }}</a></li>
+                            <li><a href="#" data-help="ssh">{{ t('help.page.ssh') }}</a></li>
+                            <li><a href="#" data-help="winrm">{{ t('help.page.winrm') }}</a></li>
+                            <li><a href="#" data-help="redfish">{{ t('help.page.redfish') }}</a></li>
+                            <li><a href="#" data-help="ipmi">{{ t('help.page.ipmi') }}</a></li>
+                            <li><a href="#" data-help="opcua">{{ t('help.page.opcua') }}</a></li>
+                            <li><a href="#" data-help="http">{{ t('help.page.http') }}</a></li>
+                            <li><a href="#" data-help="email">{{ t('help.page.email') }}</a></li>
+                            <li><a href="#" data-help="nut">{{ t('help.page.nut') }}</a></li>
+                            <li><a href="#" data-help="self-shutdown">{{ t('help.page.self-shutdown') }}</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-section">
+                <div class="accordion-header" onclick="toggleAccordion(this)">
+                    <span class="accordion-icon">▶</span>
+                    <h3>📊 {{ t('help.monitoring.title') }}</h3>
+                </div>
+                <div class="accordion-content" style="display:none;">
+                    <div class="help-content">
+                        <ul>
+                            <li><a href="#" data-help="grid-quality">{{ t('help.page.grid-quality') }}</a></li>
+                            <li><a href="#" data-help="battery">{{ t('help.page.battery') }}</a></li>
+                            <li><a href="#" data-help="solar">{{ t('help.page.solar') }}</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="help-footer">
+                <p>💡 {{ t('help.footer') }}</p>
+                <p style="margin-top: 10px; color: #94a3b8; font-size: 0.9rem;">Evolved PowerNexus v{{ version }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Settings Tab -->
+    <div id="tab-settings" class="tab-content" style="display:none;">
+        <div class="dashboard-grid">
+            <div class="card" style="grid-column: 1 / -1;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h3>⚙️ {{ t('settings.profiles') }}</h3>
+                    <button id="btnAddProfileSettings" onclick="openProfileModal(null)" style="background:#22c55e;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;">➕ {{ t('settings.new_profile') }}</button>
+                </div>
+                <div id="profilesList"></div>
+            </div>
+            <div class="card">
+                <h3>👥 {{ t('settings.users') }}</h3>
+                <div class="data-row">
+                    <span class="data-label">{{ t('settings.your_role') }}</span><span id="userRole">--</span>
+                </div>
+                <div id="userInfo"></div>
+            </div>
+            <div class="card" id="auditCard" style="display:none;grid-column:1/-1;">
+                <h3>🛡️ {{ t('security.title') }}</h3>
+                <div id="securityStatus"></div>
+                <h3 style="margin-top:14px;">{{ t('audit.title') }}</h3>
+                <div class="auto-sub">{{ t('audit.hint') }}</div>
+                <p><a class="chart-btn" href="/api/audit/export" style="display:inline-block;text-decoration:none;">{{ t('audit.export') }}</a></p>
+                <div id="auditList" style="max-height:420px;overflow:auto;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Profil hinzufügen / bearbeiten -->
+    <div id="profileModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center;">
+        <div style="background:#1e293b;border-radius:12px;padding:28px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;border:1px solid rgba(255,255,255,0.1);">
+            <h2 id="profileModalTitle" style="margin-bottom:18px;">{{ t('profile.edit') }}</h2>
+            <input type="hidden" id="profileModalMode"><!-- 'add' oder 'edit' -->
+            <input type="hidden" id="profileModalOrigName">
+
+            <div class="modal-form-grid">
+                <div>
+                    <label style="display:block;font-size:0.85rem;color:#94a3b8;margin-bottom:4px;">{{ t('profile.id') }}</label>
+                    <input id="pName" type="text" placeholder="{{ t('profile.id_example') }}" style="width:100%;padding:8px;background:#0f172a;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:white;">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.85rem;color:#94a3b8;margin-bottom:4px;">{{ t('profile.display') }}</label>
+                    <input id="pDisplayName" type="text" placeholder="{{ t('profile.name_example') }}" style="width:100%;padding:8px;background:#0f172a;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:white;">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.85rem;color:#94a3b8;margin-bottom:4px;">{{ t('profile.vendor') }}</label>
+                    <select id="pManufacturer" style="width:100%;padding:8px;background:#0f172a;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:white;">
+                        <option value="APC">APC</option>
+                        <option value="Dell">Dell</option>
+                        <option value="Woehrle">Wöhrle</option>
+                        <option value="Eaton">Eaton</option>
+                        <option value="Other">{{ t('profile.other') }}</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.85rem;color:#94a3b8;margin-bottom:4px;">{{ t('profile.conn') }}</label>
+                    <select id="pConnectionType" onchange="updateProfileFormFields()" style="width:100%;padding:8px;background:#0f172a;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:white;">
+                        <option value="snmp">{{ t('profile.conn_snmp') }}</option>
+                        <option value="usb">{{ t('profile.conn_usb') }}</option>
+                    </select>
+                </div>
+                <!-- SNMP-Felder -->
+                <div id="pSnmpFields" style="display:contents;">
+                    <div>
+                        <label style="display:block;font-size:0.85rem;color:#94a3b8;margin-bottom:4px;">{{ t('profile.ip') }}</label>
+                        <input id="pIp" type="text" placeholder="192.168.1.10" style="width:100%;padding:8px;background:#0f172a;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:white;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.85rem;color:#94a3b8;margin-bottom:4px;">SNMP Community</label>
+                        <input id="pCommunity" type="text" autocomplete="off" value="" style="width:100%;padding:8px;background:#0f172a;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:white;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.85rem;color:#94a3b8;margin-bottom:4px;">SNMP Version</label>
+                        <select id="pSnmpVersion" onchange="updateProfileFormFields()" style="width:100%;padding:8px;background:#0f172a;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:white;">
+                            <option value="1">SNMPv1</option>
+                            <option value="2" selected>SNMPv2c</option>
+                            <option value="3">{{ t('profile.snmp_recommended') }}</option>
+                        </select>
+                    </div>
+                    <div id="pSnmp3" style="display:none;">
+                        <label class="auto-field"><span>{{ t('profile.snmp3_user') }}</span><input id="pSnmpUser" autocomplete="off"></label>
+                        <label class="auto-field"><span>{{ t('profile.snmp3_auth') }}</span><input id="pSnmpAuth" type="password" autocomplete="new-password"></label>
+                        <label class="auto-field"><span>{{ t('profile.snmp3_priv') }}</span><input id="pSnmpPriv" type="password" autocomplete="new-password"></label>
+                    </div>
+                </div>
+                <!-- USB-Felder -->
+                <div id="pUsbFields" style="display:none;grid-column:1/-1;">
+                    <label style="display:block;font-size:0.85rem;color:#94a3b8;margin-bottom:4px;">{{ t('profile.nut') }}</label>
+                    <input id="pUpsName" type="text" value="ups" style="width:100%;padding:8px;background:#0f172a;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:white;">
+                </div>
+
+                <div>
+                    <label style="display:block;font-size:0.85rem;color:#94a3b8;margin-bottom:4px;">{{ t('profile.interval') }}</label>
+                    <input id="pPollingInterval" type="number" value="10" min="5" max="300" style="width:100%;padding:8px;background:#0f172a;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:white;">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.85rem;color:#94a3b8;margin-bottom:4px;">📍 {{ t('profile.location') }}</label>
+                    <select id="pLocation" style="width:100%;padding:8px;background:#0f172a;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:white;">
+                        <option value="">{{ t('profile.no_location') }}</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:0.9rem;color:#e2e8f0;cursor:pointer;">
+                        <input id="pEnabled" type="checkbox" checked> {{ t('profile.active') }}
+                    </label>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
+                <button onclick="closeProfileModal()" style="background:#475569;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;">{{ t('common.cancel') }}</button>
+                <button onclick="saveProfile()" style="background:#3b82f6;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;">💾 {{ t('common.save') }}</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Automatisierung: Dialog- und Hilfefenster (auto-core.js, auto-help.js) -->
+    <div id="autoDialog" class="auto-overlay">
+        <div class="auto-window">
+            <div class="auto-window-head"><h2 id="autoDialogTitle"></h2>
+                <button class="modal-close" onclick="Auto.closeDialog()">✕</button></div>
+            <div id="autoDialogBody" class="auto-window-body"></div>
+            <div id="autoDialogFooter" class="auto-window-foot"></div>
+        </div>
+    </div>
+    <div id="autoHelp" class="auto-overlay" style="z-index:2100;">
+        <div class="auto-window">
+            <div class="auto-window-head"><h2>📚</h2>
+                <button class="modal-close" onclick="AutoHelp.close()">✕</button></div>
+            <div id="autoHelpBody" class="auto-window-body"></div>
+        </div>
+    </div>
+
+    <!-- Groups Modal (Phase 5.6) -->
+    <div id="groupModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>{{ t('group.title') }} <span id="groupModalTitle"></span></h2>
+                <button class="modal-close" onclick="closeGroupModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="groupForm">
+                    <div class="form-group">
+                        <label>{{ t('group.name') }}</label>
+                        <input type="text" id="groupName" placeholder="{{ t('group.name_example') }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>{{ t('group.description') }}</label>
+                        <textarea id="groupDescription" placeholder="{{ t('group.description_hint') }}" style="resize:vertical; min-height:60px;"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>{{ t('group.members') }}</label>
+                        <div id="groupMembersCheckbox" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:8px; margin-top:8px; max-height:300px; overflow-y:auto; border:1px solid rgba(255,255,255,0.1); padding:12px; border-radius:6px;">
+                            <p style="color:#94a3b8; grid-column:1/-1;">{{ t('group.loading_hosts') }}</p>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeGroupModal()" class="btn-secondary">{{ t('common.cancel') }}</button>
+                <button onclick="deleteGroupModal()" class="btn-secondary" id="groupDeleteBtn" style="display:none;">🗑️ {{ t('common.delete') }}</button>
+                <button onclick="saveGroupModal()" class="btn-primary">💾 {{ t('common.save') }}</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        🔄 {{ t('footer.refresh') }} | 💾 SQLite | 🔌 USB + 🌐 SNMP
+    </div>
+</div>
+
+<script>
+let currentHistoryDays = 7;
+let historyDataCache = null;
+let _currentRole = 'guest';
+
+function showTab(tabName) {
+    ['dashboard', 'history', 'battery', 'battery-predict', 'grid-quality', 'solar', 'events', 'policies', 'hosts', 'mail', 'services', 'groups', 'help', 'settings'].forEach(t => {
+        const el = document.getElementById('tab-' + t);
+        if (el) el.style.display = t === tabName ? 'block' : 'none';
+    });
+    document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+    event.target.classList.add('active');
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+    if (tabName === 'history') { populateHistoryProfiles().then(() => loadHistory()); }
+    if (tabName === 'settings') { loadProfiles(); AutoAudit.load(); }
+    if (tabName === 'grid-quality') { populateGridLocations().then(() => loadGridQuality()); }
+    if (tabName === 'battery') { populateBatteryProfiles().then(() => loadBatteryStatus()); }
+    if (tabName === 'battery-predict') { populateMlProfiles().then(() => loadBatteryPredict()); }
+    // Phase 5.5 Tabs
+    if (tabName === 'events') { loadEvents(); }
+    if (tabName === 'policies') { AutoPolicies.load(); }
+    // Phase 5.6 Groups
+    if (tabName === 'groups') { loadGroups(); }
+    if (tabName === 'hosts') { AutoTargets.load(); }
+    if (tabName === 'mail') { AutoMail.load(); }
+    if (tabName === 'services') { AutoServices.load(); }
+    if (tabName === 'solar') { AutoSolar.load(); }
+}
+
+// ============================================
+// Session & User Management
+// ============================================
+
+async function loadUsername() {
+    try {
+        const response = await fetch('/api/session');
+        if (!response.ok) {
+            window.location.href = '/login';
+            return;
+        }
+        const sess = await response.json();
+        if (sess.authenticated) {
+            _currentRole = sess.role || 'guest';
+            document.getElementById('username').textContent = sess.user || T('common.user');
+
+            // ⚙️ Verwaltungs-Tab: admin + user
+            if (_currentRole === 'admin' || _currentRole === 'user') {
+                document.getElementById('adminTab').style.display = '';
+            }
+            // 👥 Benutzerverwaltung: nur admin
+            if (_currentRole !== 'admin') {
+                const el = document.getElementById('linkUserMgmt');
+                if (el) el.style.display = 'none';
+            }
+            // ➕ Profil hinzufügen-Button (Header + Settings): nicht für guest
+            if (_currentRole === 'guest') {
+                const h = document.getElementById('btnAddProfileHeader');
+                if (h) h.style.display = 'none';
+                const s = document.getElementById('btnAddProfileSettings');
+                if (s) s.style.display = 'none';
+            }
+        }
+    } catch (error) {
+        console.error('Fehler beim Laden der Session:', error);
+    }
+}
+
+function toggleUserMenu() {
+    const dropdown = document.getElementById('userMenuDropdown');
+    dropdown.classList.toggle('show');
+    
+    // Schließe Dropdown wenn außerhalb geklickt wird
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.user-menu')) {
+            dropdown.classList.remove('show');
+        }
+    });
+}
+
+async function loadProfiles() {
+    try {
+        const select = document.getElementById('profileSelect');
+        if (!select) {
+            console.error('❌ Profile Select Element nicht gefunden!');
+            return;
+        }
+        
+        const res = await fetch('/api/profiles');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        
+        const profiles = await res.json();
+        _allProfiles = profiles;
+        console.log('✅ Profile geladen:', profiles);
+        
+        select.innerHTML = '';
+        const listDiv = document.getElementById('profilesList');
+        if (listDiv) listDiv.innerHTML = '';
+
+        if (profiles && profiles.length > 0) {
+            for (const p of profiles) {
+                const opt = document.createElement('option');
+                opt.value = p.name;
+                opt.textContent = p.name + (p.enabled === false ? T('common.disabled_suffix') : '');
+                opt.disabled = p.enabled === false;
+                select.appendChild(opt);
+            }
+            const active = profiles.find(p => p.active);
+            if (active) select.value = active.name;
+            if (listDiv) {
+                listDiv.innerHTML = `
+                    <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
+                        <thead><tr style="background:rgba(59,130,246,0.1);">
+                            <th style="padding:8px;text-align:left;">{{ t('settings.col.name') }}</th>
+                            <th style="padding:8px;text-align:left;">{{ t('settings.col.vendor') }}</th>
+                            <th style="padding:8px;text-align:left;">{{ t('settings.col.connection') }}</th>
+                            <th style="padding:8px;text-align:left;">📍 {{ t('profile.location') }}</th>
+                            <th style="padding:8px;text-align:left;">{{ t('settings.col.actions') }}</th>
+                        </tr></thead>
+                        <tbody>` +
+                    profiles.map(p => `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                        <td style="padding:8px;"><strong>${p.name}</strong></td>
+                        <td style="padding:8px;">${p.manufacturer || '—'}</td>
+                        <td style="padding:8px;">${p.connection_type === 'usb' ? '🔌 USB' : '🌐 SNMP'} ${p.ip ? '(' + p.ip + ')' : ''}</td>
+                        <td style="padding:8px;">${p.location ? '📍 ' + p.location : '<span style="color:#64748b;">—</span>'}</td>
+                        <td style="padding:8px;display:flex;gap:6px;">
+                            ${_currentRole === 'admin' ? `<button onclick='openProfileModal(${JSON.stringify(p)})' style="background:#3b82f6;color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;">✏️</button>` : ''}
+                            ${_currentRole === 'admin' ? `<button onclick="deleteProfile('${p.name.replace(/'/g, "\\'")}')" style="background:#ef4444;color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;">🗑️</button>` : ''}
+                        </td>
+                    </tr>`).join('') +
+                    `</tbody></table>`;
+            }
+            console.log(`✅ ${profiles.length} Profile geladen`);
+        } else {
+            console.warn('⚠️ Keine Profile verfügbar');
+        }
+    } catch (error) {
+        console.error('❌ Fehler beim Laden der Profile:', error);
+    }
+}
+
+async function switchProfile() {
+    try {
+        const profile = document.getElementById('profileSelect').value;
+        if (!profile) {
+            console.warn('⚠️ Kein Profil ausgewählt');
+            return;
+        }
+        
+        console.log(`🔄 Wechsle zu Profil: ${profile}`);
+        const res = await fetch(`/api/switch?profile=${encodeURIComponent(profile)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        
+        console.log('✅ Profil gewechselt');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await loadDashboard();
+        await loadHistory();
+    } catch (error) {
+        console.error('❌ Fehler beim Profil-Wechsel:', error);
+        alert(T('profile.switch_failed'));
+    }
+}
+
+async function createProfile() {
+    // Ersetzt durch openProfileModal()
+}
+
+async function deleteProfile(name) {
+    if (!confirm(T('profile.confirm_delete', { name: name }))) return;
+    try {
+        const res = await fetch('/api/admin/profile-delete', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({profile: name})
+        });
+        const data = await res.json();
+        if (res.ok) {
+            await loadProfiles();
+            alert('🗑️ ' + T('profile.deleted', { name: name }));
+        } else {
+            alert(T('common.error_prefix', { error: data.error || T('common.unknown_error') }));
+        }
+    } catch (e) {
+        alert(T('profile.delete_failed', { error: e }));
+    }
+}
+
+let _allProfiles = [];
+let _allLocations = [];
+
+async function openProfileModal(profile) {
+    // Standorte nachladen
+    try {
+        const r = await fetch('/api/locations');
+        _allLocations = await r.json();
+    } catch(e) { _allLocations = []; }
+
+    const locSel = document.getElementById('pLocation');
+    locSel.innerHTML = '<option value="">' + T('profile.no_location') + '</option>';
+    for (const loc of _allLocations) {
+        const opt = document.createElement('option');
+        opt.value = loc; opt.textContent = loc;
+        locSel.appendChild(opt);
+    }
+
+    if (profile) {
+        document.getElementById('profileModalTitle').textContent = T('profile.edit_title', { name: profile.name });
+        document.getElementById('profileModalMode').value = 'edit';
+        document.getElementById('profileModalOrigName').value = profile.name;
+        document.getElementById('pName').value = profile.name;
+        document.getElementById('pName').disabled = true;
+        document.getElementById('pDisplayName').value = profile.display_name || '';
+        document.getElementById('pManufacturer').value = profile.manufacturer || 'APC';
+        document.getElementById('pConnectionType').value = profile.connection_type || 'snmp';
+        document.getElementById('pIp').value = profile.ip || '';
+        document.getElementById('pCommunity').value = profile.community || 'public';
+        document.getElementById('pSnmpVersion').value = String(profile.snmp_version || 2);
+        document.getElementById('pSnmpUser').value = profile.snmp_user || '';
+        ['pSnmpAuth', 'pSnmpPriv'].forEach(id => {
+            const field = document.getElementById(id);
+            field.value = '';
+            field.placeholder = profile.snmp_has_secrets ? T('profile.snmp3_keep') : '';
+        });
+
+        document.getElementById('pUpsName').value = profile.ups_name || 'ups';
+        document.getElementById('pPollingInterval').value = profile.polling_interval || 10;
+        document.getElementById('pLocation').value = profile.location || '';
+        document.getElementById('pEnabled').checked = profile.enabled !== false;
+    } else {
+        document.getElementById('profileModalTitle').textContent = T('profile.new_title');
+        document.getElementById('profileModalMode').value = 'add';
+        document.getElementById('profileModalOrigName').value = '';
+        document.getElementById('pName').value = '';
+        document.getElementById('pName').disabled = false;
+        document.getElementById('pDisplayName').value = '';
+        document.getElementById('pManufacturer').value = 'APC';
+        document.getElementById('pConnectionType').value = 'snmp';
+        document.getElementById('pIp').value = '';
+        document.getElementById('pCommunity').value = '';
+        document.getElementById('pSnmpVersion').value = '2';
+        ['pSnmpUser', 'pSnmpAuth', 'pSnmpPriv'].forEach(id => { const field = document.getElementById(id); field.value = ''; field.placeholder = ''; });
+
+        document.getElementById('pUpsName').value = 'ups';
+        document.getElementById('pPollingInterval').value = '10';
+        document.getElementById('pLocation').value = '';
+        document.getElementById('pEnabled').checked = true;
+    }
+    updateProfileFormFields();
+    document.getElementById('profileModal').style.display = 'flex';
+}
+
+function closeProfileModal() {
+    document.getElementById('profileModal').style.display = 'none';
+}
+
+function updateProfileFormFields() {
+    const type = document.getElementById('pConnectionType').value;
+    const snmpFields = document.querySelectorAll('#pSnmpFields > div');
+    const usbDiv = document.getElementById('pUsbFields');
+    snmpFields.forEach(el => el.style.display = type === 'snmp' ? '' : 'none');
+    document.getElementById('pSnmp3').style.display = type === 'snmp' && document.getElementById('pSnmpVersion').value === '3' ? '' : 'none';
+    usbDiv.style.display = type === 'usb' ? 'block' : 'none';
+}
+
+async function saveProfile() {
+    const mode = document.getElementById('profileModalMode').value;
+    const name = document.getElementById('pName').value.trim();
+    if (!name) { alert(T('profile.name_required')); return; }
+
+    const payload = {
+        name: name,
+        display_name: document.getElementById('pDisplayName').value.trim() || name,
+        manufacturer: document.getElementById('pManufacturer').value,
+        connection_type: document.getElementById('pConnectionType').value,
+        ip: document.getElementById('pIp').value.trim(),
+        community: document.getElementById('pCommunity').value.trim(),
+        snmp_version: parseInt(document.getElementById('pSnmpVersion').value),
+        snmp_user: document.getElementById('pSnmpUser').value.trim(),
+        snmp_auth_password: document.getElementById('pSnmpAuth').value,
+        snmp_priv_password: document.getElementById('pSnmpPriv').value,
+        ups_name: document.getElementById('pUpsName').value.trim(),
+        polling_interval: parseInt(document.getElementById('pPollingInterval').value) || 10,
+        location: document.getElementById('pLocation').value,
+        enabled: document.getElementById('pEnabled').checked,
+    };
+
+    const url = mode === 'add' ? '/api/admin/profile-create' : '/api/admin/profile-update';
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok) {
+            closeProfileModal();
+            await loadProfiles();
+            alert('✅ ' + T(mode === 'add' ? 'profile.created' : 'profile.updated', { name: name }));
+        } else {
+            alert(T('common.error_prefix', { error: data.error || T('common.unknown_error') }));
+        }
+    } catch(e) {
+        alert(T('common.error_prefix', { error: e }));
+    }
+}
+
+async function loadDashboard() {
+    try {
+        const res = await fetch('/api/data');
+        const data = await res.json();
+        
+        const status = data.status_text || 'UNKNOWN';
+        const statusClass = status === 'ONLINE' ? 'status-online' : (status === 'ON BATTERY' ? 'status-battery' : 'status-unknown');
+        document.getElementById('statusValue').innerHTML = `<span class="${statusClass}">${status}</span>`;
+        document.getElementById('powerStatus').innerHTML = `<span class="${statusClass}">${status}</span>`;
+        
+        if (data.runtime_warning && status === 'ON BATTERY') {
+            document.getElementById('runtimeWarning').style.display = 'block';
+        } else {
+            document.getElementById('runtimeWarning').style.display = 'none';
+        }
+        
+        document.getElementById('model').textContent = data.model || data.profile || '--';
+        document.getElementById('serial').textContent = data.serial || '--';
+        document.getElementById('connectionType').innerHTML = data.connection_type === 'usb' ? '🔌 ' + T('dash.usb_local') : '🌐 SNMP';
+        document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString(window.LANG);
+        
+        document.getElementById('batteryCharge').innerHTML = (data.battery_charge || 0) + '<small>%</small>';
+        document.getElementById('runtime').innerHTML = (data.runtime_minutes || 0) + ' min';
+        document.getElementById('temperature').innerHTML = (data.battery_temp_celsius || 0) + ' °C';
+        document.getElementById('batteryVoltage').innerHTML = (data.battery_voltage_formatted || 0) + ' V';
+        
+        document.getElementById('inputInfo').innerHTML = (data.input_voltage_formatted || 0) + ' V / ' + (data.input_current_formatted || 0) + ' A';
+        document.getElementById('outputInfo').innerHTML = (data.output_voltage_formatted || 0) + ' V / ' + (data.output_current_formatted || 0) + ' A';
+        document.getElementById('load').innerHTML = (data.output_load || 0) + ' %';
+        document.getElementById('powerInfo').innerHTML = (data.output_power_w || 0) + ' W / ' + (data.output_power_va || 0) + ' VA';
+        
+        const warnings = [];
+        if (data.battery_charge < 20) warnings.push('🚨 ' + T('dash.battery_critical', { charge: data.battery_charge }));
+        else if (data.battery_charge < 50) warnings.push('⚠️ ' + T('dash.battery_low', { charge: data.battery_charge }));
+        if (status === 'ON BATTERY') warnings.push('🔌 ' + T('dash.on_battery', { minutes: data.runtime_minutes }));
+        
+        const warningsDiv = document.getElementById('warnings');
+        if (warnings.length === 0) warningsDiv.innerHTML = '✅ ' + T('dash.no_warnings');
+        else warningsDiv.innerHTML = warnings.map(w => `<div style="padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05);">${w}</div>`).join('');
+        
+    } catch(e) { console.error('Dashboard Fehler:', e); }
+}
+
+// ============================================
+// Battery ML Prediction
+// ============================================
+let _mlGaugeChart = null;
+let _mlImportanceChart = null;
+
+async function populateMlProfiles() {
+    const sel = document.getElementById('mlProfileSelect');
+    if (!sel || sel.options.length > 1) return;
+    try {
+        const res = await fetch('/api/profiles');
+        if (!res.ok) return;
+        const profiles = await res.json();
+        profiles.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.name;
+            opt.textContent = p.name + (p.enabled === false ? T('common.disabled_suffix') : '');
+            sel.appendChild(opt);
+        });
+    } catch(e) { console.error('Profil-Laden Fehler:', e); }
+}
+
+// Batteriebewertung: A. technischer Zustand, B. Restlebensdauer, C. Datenbasis
+const BAT_STATUS = {
+    CRITICAL: { label: '🔴 ' + T('status.critical'), color: '#ef4444' },
+    WARNING:  { label: '⚠️ ' + T('status.warning'),  color: '#f59e0b' },
+    GOOD:     { label: '✅ ' + T('status.good'), color: '#22c55e' },
+    UNKNOWN:  { label: '❔ ' + T('status.unknown'), color: '#94a3b8' },
+};
+const BAT_QUALITY = {
+    GOOD: { label: 'ausreichend', color: '#22c55e' },
+    LIMITED: { label: T('quality.limited'), color: '#f59e0b' },
+    INSUFFICIENT: { label: 'unzureichend', color: '#ef4444' },
+};
+
+function _setBadge(el, text, color) {
+    el.textContent = text;
+    el.style.background = color + '22';
+    el.style.color = color;
+    el.style.border = '1px solid ' + color + '55';
+}
+
+async function loadBatteryPredict() {
+    const sel = document.getElementById('mlProfileSelect');
+    const profile = sel ? sel.value : '';
+    const url = profile ? `/api/battery/predict?profile=${encodeURIComponent(profile)}` : '/api/battery/predict';
+    try {
+        const res = await fetch(url);
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || ('HTTP ' + res.status));
+
+        // Gesamtbewertung
+        const overall = BAT_STATUS[d.risk_level] || BAT_STATUS.UNKNOWN;
+        _setBadge(document.getElementById('mlRiskBadge'), d.overall_text || overall.label, overall.color);
+
+        // B. Restlebensdauer
+        const life = d.lifetime || {};
+        const lifeStatus = BAT_STATUS[life.status] || BAT_STATUS.UNKNOWN;
+        document.getElementById('mlDaysValue').textContent = typeof life.months === 'number' ? life.months : '?';
+        document.getElementById('mlLifetimeBasis').textContent = life.basis
+            ? T('pred.basis', { basis: life.basis }) : T('pred.no_basis');
+        _renderMlGauge(life.months, lifeStatus.color);
+
+        // A. Technischer Zustand
+        const cond = d.condition || {};
+        const condStatus = BAT_STATUS[cond.status] || BAT_STATUS.UNKNOWN;
+        const condEl = document.getElementById('mlCondition');
+        condEl.textContent = condStatus.label;
+        condEl.style.color = condStatus.color;
+
+        // C. Datenbasis
+        const dq = d.data_quality || { available: [], missing: [] };
+        const total = dq.available.length + dq.missing.length;
+        const share = total ? Math.round(100 * dq.available.length / total) : 0;
+        const q = BAT_QUALITY[dq.level] || BAT_QUALITY.INSUFFICIENT;
+        document.getElementById('mlConfidenceValue').textContent = T('pred.of_items', { label: q.label, count: dq.available.length, total: total });
+        const fill = document.getElementById('mlConfidenceFill');
+        fill.style.width = share + '%';
+        fill.style.background = q.color;
+        const noteEl = document.getElementById('mlNote');
+        if (dq.missing.length) {
+            noteEl.textContent = T('pred.missing', { items: dq.missing.join(' · ') });
+            noteEl.style.display = '';
+        } else {
+            noteEl.style.display = 'none';
+        }
+        _setBadge(document.getElementById('mlMethodBadge'), 'Datenbasis: ' + q.label, q.color);
+        document.getElementById('mlMethodBadge').style.display = '';
+
+        // Trend aus Messdaten nur mit ausreichender Historie
+        const trend = d.trend || {};
+        document.getElementById('mlDegradationRate').textContent = trend.available
+            ? T('pred.trend_value', { days: trend.days_remaining, method: T(trend.method === 'ml' ? 'pred.ml_model' : 'pred.heuristic') })
+            : (trend.note || T('pred.not_available'));
+        if (d.timestamp) {
+            document.getElementById('mlTimestamp').textContent = new Date(d.timestamp).toLocaleString('de-DE');
+        }
+
+        // Befunde und Empfehlung
+        const lines = [];
+        (cond.findings || []).forEach(f => lines.push((cond.status === 'UNKNOWN' ? 'ℹ️ ' : '⚠️ ') + f));
+        (cond.evidence || []).forEach(e => lines.push('✅ ' + e));
+        (life.findings || []).forEach(f => lines.push('⚠️ ' + f));
+        (d.hints || []).forEach(h => lines.push('ℹ️ ' + h));
+        const rec = document.getElementById('mlRecommendation');
+        rec.style.whiteSpace = 'pre-line';
+        rec.textContent = lines.length ? lines.join('\n') : (d.overall_text || '--');
+
+        // Feature-Wichtigkeit nur mit trainiertem Modell
+        _renderMlImportanceChart(d.feature_importances || {});
+
+        _loadMlOverview();
+    } catch (e) {
+        console.error('Battery Predict Fehler:', e);
+        document.getElementById('mlRecommendation').textContent = T('pred.load_failed', { error: e.message });
+    }
+}
+
+async function _loadMlOverview() {
+    try {
+        const res = await fetch('/api/battery/health_overview');
+        if (!res.ok) return;
+        const profiles = (await res.json()).profiles || [];
+        const list = document.getElementById('mlOverviewList');
+        list.innerHTML = '';
+        if (!profiles.length) { list.textContent = T('pred.no_profiles'); return; }
+        profiles.forEach(p => {
+            const st = BAT_STATUS[p.risk_level] || BAT_STATUS.UNKNOWN;
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06);';
+            const name = document.createElement('span');
+            name.style.color = '#e2e8f0';
+            name.textContent = p.display_name || p.profile;
+            const value = document.createElement('span');
+            value.style.cssText = `color:${st.color};font-weight:600;white-space:nowrap;`;
+            const months = p.lifetime_months === null || p.lifetime_months === undefined ? T('pred.months_unknown') : T('pred.months_short', { months: p.lifetime_months });
+            value.textContent = `${months} · ${st.label.replace(/^\S+\s/, '')}` + (p.live_data ? '' : ' · ' + T('pred.offline'));
+            row.append(name, value);
+            list.appendChild(row);
+        });
+    } catch (e) { console.error('Overview Fehler:', e); }
+}
+
+function _renderMlGauge(months, color) {
+    const ctx = document.getElementById('mlGaugeChart');
+    if (!ctx) return;
+    const maxMonths = 60;   // typische Lebensdauer 5 Jahre
+    const filled = typeof months === 'number' ? Math.min(months, maxMonths) : 0;
+    if (_mlGaugeChart) _mlGaugeChart.destroy();
+    _mlGaugeChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            datasets: [{
+                data: [filled, maxMonths - filled],
+                backgroundColor: [color, 'rgba(255,255,255,0.06)'],
+                borderWidth: 0,
+                circumference: 270,
+                rotation: 225,
+            }]
+        },
+        options: {
+            responsive: false,
+            cutout: '72%',
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            animation: { duration: 600 }
+        }
+    });
+}
+
+function _renderMlImportanceChart(fi) {
+    const ctx = document.getElementById('mlImportanceChart');
+    if (!ctx) return;
+    const labelMap = {
+        capacity_trend: T('ml.capacity_trend'),
+        avg_temp: T('ml.avg_temp'),
+        temp_trend: 'Temperatur-Trend',
+        charge_cycles: T('ml.charge_cycles'),
+        age_days: T('ml.age_days'),
+        avg_load: T('ml.avg_load'),
+        load_variance: 'Last-Varianz',
+        runtime_trend: 'Laufzeit-Trend',
+        voltage_trend: 'Spannungs-Trend',
+        critical_events: T('ml.critical_events'),
+    };
+    const entries = Object.entries(fi).sort((a, b) => b[1] - a[1]);
+    // Nur mit trainiertem Modell und repräsentativen Daten anzeigen
+    document.getElementById('mlImportanceContainer').style.display = entries.length ? '' : 'none';
+    if (entries.length === 0) return;
+    const labels = entries.map(([k]) => labelMap[k] || k);
+    const values = entries.map(([, v]) => +(v * 100).toFixed(2));
+
+    if (_mlImportanceChart) _mlImportanceChart.destroy();
+    _mlImportanceChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: T('ml.importance'),
+                data: values,
+                backgroundColor: values.map((_, i) => `hsl(${260 - i * 20},70%,60%)`),
+                borderRadius: 5,
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: c => c.parsed.x.toFixed(2) + ' %' } }
+            },
+            scales: {
+                x: { ticks: { color: '#64748b', callback: v => v + '%' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                y: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+            }
+        }
+    });
+    document.getElementById('mlChartInfo').textContent = T('ml.basis');
+}
+
+// ============================================
+// Netzqualität
+// ============================================
+let _gridGaugeChart = null;
+let _gridTrendChart = null;
+
+async function populateGridLocations() {
+    const sel = document.getElementById('gridLocationSelect');
+    if (!sel || sel.options.length > 1) return; // bereits befüllt
+    try {
+        const res = await fetch('/api/locations');
+        if (!res.ok) return;
+        const locations = await res.json();
+        locations.forEach(loc => {
+            const opt = document.createElement('option');
+            opt.value = loc;
+            opt.textContent = loc;
+            sel.appendChild(opt);
+        });
+    } catch(e) { console.error('Standorte laden Fehler:', e); }
+}
+
+async function loadGridQuality() {
+    const sel = document.getElementById('gridLocationSelect');
+    const location = sel ? sel.value : '';
+    const url = location ? `/api/grid_quality?location=${encodeURIComponent(location)}` : '/api/grid_quality';
+    try {
+        const res = await fetch(url);
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            _showGridNoData(location, err.error || `Keine Messwerte (HTTP ${res.status})`);
+            _renderGridTrendChart();
+            return;
+        }
+        const d = await res.json();
+
+        // --- Score & Status-Badge ---
+        const score = d.overall_score ?? 0;
+        const status = d.status ?? '--';
+        document.getElementById('gridScoreValue').textContent = score;
+
+        const badge = document.getElementById('gridStatusBadge');
+        const statusColors = { EXCELLENT: '#22c55e', GOOD: '#86efac', FAIR: '#f59e0b', POOR: '#ef4444', ERROR: '#6b7280' };
+        badge.textContent = status;
+        badge.style.background = (statusColors[status] || '#64748b') + '33';
+        badge.style.color = statusColors[status] || '#94a3b8';
+        badge.style.border = '1px solid ' + (statusColors[status] || '#64748b') + '55';
+
+        // Standort-Badge
+        const locBadge = document.getElementById('gridLocationBadge');
+        if (location) {
+            locBadge.textContent = '📍 ' + location + (d.profile ? ' · ' + d.profile : '');
+            locBadge.style.display = '';
+            locBadge.style.background = '#3b82f633';
+            locBadge.style.color = '#93c5fd';
+        } else {
+            locBadge.style.display = 'none';
+        }
+
+        document.getElementById('gridRecommendation').textContent = d.recommendation || '';
+
+        // --- Gauge-Chart ---
+        _renderGauge(score);
+
+        // --- Frequenz ---
+        const freq = d.components?.frequency;
+        if (freq) {
+            document.getElementById('gridFrequency').innerHTML = `${freq.frequency} <small>Hz</small>`;
+            document.getElementById('gridFreqDeviation').textContent = freq.deviation + ' Hz';
+            document.getElementById('gridFreqTrend').textContent = _trendLabel(freq.trend);
+            document.getElementById('gridFreqStatus').innerHTML = _statusBadgeHtml(freq.status);
+        }
+
+        // --- Spannung ---
+        const volt = d.components?.voltage;
+        if (volt) {
+            document.getElementById('gridVoltage').innerHTML = `${volt.average} <small>V</small>`;
+            document.getElementById('gridVoltVariance').textContent = volt.variance + ' V';
+            document.getElementById('gridVoltUnbalance').textContent = volt.unbalance_percent + ' %';
+            document.getElementById('gridVoltStatus').innerHTML = _statusBadgeHtml(volt.status);
+        }
+
+        // --- Flatterstrom ---
+        const flutter = d.components?.flutter;
+        if (flutter) {
+            document.getElementById('gridFlutterStatus').innerHTML = _statusBadgeHtml(flutter.status === 'OK' ? 'EXCELLENT' : 'POOR');
+            document.getElementById('gridFlutterRisk').textContent = flutter.risk_level || '--';
+        }
+
+        // --- Probleme ---
+        const issuesDiv = document.getElementById('gridIssuesList');
+        if (d.issues && d.issues.length > 0) {
+            issuesDiv.innerHTML = d.issues.map(i =>
+                `<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.06);color:#fbbf24;">⚠️ ${i}</div>`
+            ).join('');
+        } else {
+            issuesDiv.innerHTML = '<div style="color:#22c55e;">✅ ' + T('grid.no_issues') + '</div>';
+        }
+
+        // --- Verlauf (gemessene Werte je USV) ---
+        _renderGridTrendChart();
+
+    } catch(e) { console.error('Grid Quality Fehler:', e); }
+}
+
+function _statusBadgeHtml(status) {
+    const map = { EXCELLENT: ['#22c55e',T('grid.excellent')], GOOD: ['#86efac',T('grid.good')], FAIR: ['#f59e0b',T('grid.fair')], POOR: ['#ef4444',T('grid.poor')], STABLE: ['#22c55e',T('grid.stable')], WARNING: ['#f59e0b',T('status.warning')], CRITICAL: ['#ef4444',T('grid.critical')], OK: ['#22c55e','OK'], DETECTED: ['#f59e0b',T('grid.detected')] };
+    const [col, label] = map[status] || ['#94a3b8', status || '--'];
+    return `<span style="color:${col};font-weight:600;">${label}</span>`;
+}
+
+function _trendLabel(trend) {
+    const map = { STABLE: '↔ ' + T('grid.stable'), RISING: '↑ ' + T('grid.rising'), FALLING: '↓ ' + T('grid.falling'), INSUFFICIENT_DATA: T('common.no_data'), UNKNOWN: '?', ERROR: T('common.error') };
+    return map[trend] || trend || '--';
+}
+
+function _renderGauge(score) {
+    const ctx = document.getElementById('gridGaugeChart');
+    if (!ctx) return;
+    const color = score >= 80 ? '#22c55e' : score >= 60 ? '#86efac' : score >= 40 ? '#f59e0b' : '#ef4444';
+    const remaining = 100 - score;
+    if (_gridGaugeChart) _gridGaugeChart.destroy();
+    _gridGaugeChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            datasets: [{
+                data: [score, remaining],
+                backgroundColor: [color, 'rgba(255,255,255,0.06)'],
+                borderWidth: 0,
+                circumference: 270,
+                rotation: 225,
+            }]
+        },
+        options: {
+            responsive: false,
+            cutout: '72%',
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            animation: { duration: 600 }
+        }
+    });
+}
+
+// Plot-Container: Plotly-Diagramm und Hinweistext liegen in getrennten Kind-Elementen.
+// (Den Plotly-Div per innerHTML zu leeren, ließ Plotly.react danach nichts mehr zeichnen.)
+function _plotTargets(containerId, height) {
+    const el = document.getElementById(containerId);
+    let plot = el.querySelector(':scope > .plot-area');
+    let msg = el.querySelector(':scope > .plot-message');
+    if (!plot) {
+        el.innerHTML = '';
+        plot = document.createElement('div');
+        plot.className = 'plot-area';
+        msg = document.createElement('div');
+        msg.className = 'plot-message';
+        msg.style.cssText = `height:${height}px;display:none;align-items:center;justify-content:center;color:#94a3b8;font-size:0.9rem;`;
+        el.append(plot, msg);
+    }
+    return { plot, msg };
+}
+
+function _plotMessage(containerId, height, text) {
+    const t = _plotTargets(containerId, height);
+    t.plot.style.display = 'none';
+    t.msg.style.display = 'flex';
+    t.msg.textContent = '📭 ' + text;
+}
+
+function _plotDraw(containerId, height, traces, layout) {
+    const t = _plotTargets(containerId, height);
+    t.msg.style.display = 'none';
+    t.plot.style.display = '';
+    Plotly.react(t.plot, traces, layout, { displaylogo: false, responsive: true })
+        .then(() => { if (t.plot.offsetWidth > 0) Plotly.Plots.resize(t.plot); });
+}
+
+function _showGridNoData(location, message) {
+    document.getElementById('gridScoreValue').textContent = '--';
+    const badge = document.getElementById('gridStatusBadge');
+    badge.textContent = T('grid.no_data_badge');
+    badge.style.background = '#6b728033';
+    badge.style.color = '#94a3b8';
+    badge.style.border = '1px solid #6b728055';
+    const locBadge = document.getElementById('gridLocationBadge');
+    if (location) { locBadge.textContent = '📍 ' + location; locBadge.style.display = ''; }
+    else { locBadge.style.display = 'none'; }
+    document.getElementById('gridRecommendation').textContent = message;
+    ['gridFrequency', 'gridVoltage', 'gridFreqDeviation', 'gridFreqTrend',
+     'gridVoltVariance', 'gridVoltUnbalance', 'gridFlutterRisk']
+        .forEach(id => { document.getElementById(id).textContent = '--'; });
+    ['gridFreqStatus', 'gridVoltStatus', 'gridFlutterStatus', 'gridIssuesList']
+        .forEach(id => { document.getElementById(id).innerHTML = ''; });
+    _renderGauge(0);
+}
+
+// Netzqualität-Verlauf (Plotly): gemessene Werte je USV des Standorts
+const GRID_SERIES_COLORS = ['#3b82f6', '#22c55e', '#a855f7', '#ec4899', '#14b8a6', '#f97316'];
+
+function _renderGridTrendChart() {
+    const sel = document.getElementById('gridLocationSelect');
+    const daysSel = document.getElementById('gridHistoryDays');
+    _loadGridHistory(sel ? sel.value : '', daysSel ? (parseInt(daysSel.value, 10) || 1) : 1);
+}
+
+function _showGridChartMessage(el, info, message) {
+    _plotMessage('gridTrendChart', 300, message);
+    if (info) info.textContent = '';
+}
+
+async function _loadGridHistory(location, days) {
+    const el = document.getElementById('gridTrendChart');
+    const info = document.getElementById('gridChartInfo');
+    if (!el) return;
+    if (!window.Plotly) {
+        _showGridChartMessage(el, info, T('chart.lib_failed'));
+        return;
+    }
+
+    const params = new URLSearchParams({ days: String(days) });
+    if (location) params.set('location', location);
+    let d;
+    try {
+        const res = await fetch('/api/grid_quality_history?' + params.toString());
+        d = await res.json();
+        if (!res.ok) throw new Error(d.error || ('HTTP ' + res.status));
+    } catch (e) {
+        _showGridChartMessage(el, info, T('grid.history_failed', { error: e.message }));
+        return;
+    }
+
+    const series = (d.series || []).filter(s => s.timestamp && s.timestamp.length > 0);
+    if (series.length === 0) {
+        _showGridChartMessage(el, info, d.message || T('grid.no_values'));
+        return;
+    }
+
+    const traces = [];
+    let hasFrequency = false;
+    series.forEach((s, i) => {
+        const color = GRID_SERIES_COLORS[i % GRID_SERIES_COLORS.length];
+        const x = s.timestamp.map(ts => new Date(ts * 1000));
+        traces.push({
+            x, y: s.voltage, name: s.name + ' · ' + T('dash.voltage'), legendgroup: s.profile,
+            type: 'scatter', mode: 'lines', line: { color, width: 1.8 },
+            hovertemplate: '%{y:.1f} V<extra>' + s.name + '</extra>',
+        });
+        if (s.frequency && s.frequency.some(f => f !== null)) {
+            hasFrequency = true;
+            traces.push({
+                x, y: s.frequency, name: s.name + ' · ' + T('grid.frequency'), legendgroup: s.profile, yaxis: 'y2',
+                type: 'scatter', mode: 'lines', connectgaps: false, line: { color, width: 1.2, dash: 'dot' },
+                hovertemplate: '%{y:.2f} Hz<extra>' + s.name + '</extra>',
+            });
+        }
+    });
+
+    // Toleranzband ±10 % um 230 V
+    const band = (y) => ({
+        type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: y, y1: y,
+        line: { color: 'rgba(239,68,68,0.35)', width: 1, dash: 'dash' },
+    });
+    const layout = {
+        paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+        font: { color: '#94a3b8', size: 11 },
+        height: 300, margin: { l: 55, r: hasFrequency ? 60 : 20, t: 10, b: 40 },
+        hovermode: 'x unified',
+        legend: { orientation: 'h', y: -0.22 },
+        xaxis: { type: 'date', gridcolor: 'rgba(255,255,255,0.05)' },
+        yaxis: { title: { text: T('chart.voltage_axis') }, gridcolor: 'rgba(255,255,255,0.05)', zeroline: false },
+        shapes: [band(207), band(253)],
+    };
+    if (hasFrequency) {
+        layout.yaxis2 = { title: { text: T('chart.frequency_axis') }, overlaying: 'y', side: 'right', showgrid: false, zeroline: false };
+    }
+
+    _plotDraw('gridTrendChart', 300, traces, layout);
+    const span = days === 1 ? '24 h' : T('chart.days', { days: days });
+    info.textContent = T('grid.points', { count: d.count, ups: series.length, span: span }) + (d.bin_size !== 'raw' ? ' · ' + T('grid.hourly') : '');
+}
+
+async function populateHistoryProfiles() {
+    const sel = document.getElementById('historyProfileSelect');
+    if (!sel || sel.options.length > 1) return; // bereits befüllt
+    try {
+        const res = await fetch('/api/profiles');
+        if (!res.ok) return;
+        (await res.json()).forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.name;
+            opt.textContent = (p.display_name || p.name) + (p.enabled === false ? T('common.disabled_suffix') : '');
+            sel.appendChild(opt);
+        });
+    } catch (e) { console.error('Profile laden Fehler:', e); }
+}
+
+function _showHistoryMessage(message) {
+    _plotMessage('historyChart', 360, message);
+}
+
+async function loadHistory() {
+    const info = document.getElementById('chartInfo');
+    const sel = document.getElementById('historyProfileSelect');
+    const params = new URLSearchParams({ days: String(currentHistoryDays) });
+    if (sel && sel.value) params.set('profile', sel.value);
+    try {
+        info.innerHTML = '<span class="loading"></span> ' + T('common.loading_data');
+        const res = await fetch('/api/history?' + params.toString());
+        const payload = await res.json();
+        if (!res.ok) throw new Error(payload.error || ('HTTP ' + res.status));
+        const data = payload.data || {};
+
+        if (data.timestamp && data.timestamp.length > 0) {
+            historyDataCache = data;
+            updateChart();
+            const binInfo = payload.bin_size && payload.bin_size !== 'raw'
+                ? ' · ' + T('hist.binned', { bin: payload.bin_size >= 3600 ? T('hist.bin_hour') : (payload.bin_size / 60) + ' min' }) : '';
+            info.textContent = T('hist.points', { profile: payload.profile, count: data.count, days: currentHistoryDays }) + binInfo;
+        } else {
+            historyDataCache = null;
+            _showHistoryMessage(T('hist.none', { profile: payload.profile || 'USV', days: currentHistoryDays }));
+            info.textContent = T('hist.saved_every_minute');
+        }
+    } catch (e) {
+        console.error('History Fehler:', e);
+        historyDataCache = null;
+        _showHistoryMessage(T('hist.load_failed', { error: e.message }));
+        info.textContent = '';
+    }
+}
+
+// Messgrößen der Historie: Spannungen auf eigener rechter Achse (y2)
+const HISTORY_METRICS = [
+    { id: 'showCharge',  field: 'battery_charge',      label: T('hist.charge'),      color: '#22c55e', axis: 'y' },
+    { id: 'showRuntime', field: 'battery_runtime',     label: T('hist.runtime'),  color: '#3b82f6', axis: 'y' },
+    { id: 'showInput',   field: 'input_voltage',       label: T('hist.input'),     color: '#8b5cf6', axis: 'y2' },
+    { id: 'showOutput',  field: 'output_voltage',      label: T('hist.output'),     color: '#f59e0b', axis: 'y2' },
+    { id: 'showLoad',    field: 'ups_load',            label: T('hist.load'),        color: '#ef4444', axis: 'y' },
+    { id: 'showTemp',    field: 'battery_temperature', label: T('hist.temperature'), color: '#ec4899', axis: 'y' },
+];
+
+function updateChart() {
+    const data = historyDataCache;
+    if (!data || !data.timestamp || data.timestamp.length === 0) return;
+    if (!window.Plotly) {
+        _showHistoryMessage(T('chart.lib_failed'));
+        return;
+    }
+
+    const x = data.timestamp.map(ts => new Date(ts * 1000));
+    const traces = HISTORY_METRICS
+        .filter(m => document.getElementById(m.id).checked && Array.isArray(data[m.field]))
+        .map(m => ({
+            x, y: data[m.field], name: m.label, yaxis: m.axis,
+            type: 'scatter', mode: 'lines', connectgaps: false,
+            line: { color: m.color, width: 1.6 },
+            hovertemplate: '%{y:.1f}<extra>' + m.label + '</extra>',
+        }));
+    if (traces.length === 0) {
+        _showHistoryMessage(T('hist.none_selected'));
+        return;
+    }
+
+    const hasLeft = traces.some(t => t.yaxis === 'y');
+    const hasRight = traces.some(t => t.yaxis === 'y2');
+    if (!hasLeft) traces.forEach(t => { t.yaxis = 'y'; });  // nur Spannungen: eine Achse genügt
+
+    const grid = 'rgba(255,255,255,0.05)';
+    const layout = {
+        paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+        font: { color: '#94a3b8', size: 11 },
+        height: 360, margin: { l: 55, r: hasLeft && hasRight ? 60 : 20, t: 10, b: 40 },
+        hovermode: 'x unified',
+        legend: { orientation: 'h', y: -0.18 },
+        xaxis: { type: 'date', gridcolor: grid },
+        yaxis: { title: { text: hasLeft ? '% · min · °C' : T('chart.voltage_axis') }, gridcolor: grid, zeroline: false },
+    };
+    if (hasLeft && hasRight) {
+        layout.yaxis2 = { title: { text: T('chart.voltage_axis') }, overlaying: 'y', side: 'right', showgrid: false, zeroline: false };
+    }
+
+    _plotDraw('historyChart', 360, traces, layout);
+}
+
+document.querySelectorAll('#tab-history .chart-btn[data-days]').forEach(btn => {
+    btn.addEventListener('click', function() {
+        currentHistoryDays = parseInt(this.getAttribute('data-days'), 10);
+        document.querySelectorAll('#tab-history .chart-btn[data-days]').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        loadHistory();
+    });
+});
+
+['showCharge', 'showRuntime', 'showInput', 'showOutput', 'showLoad', 'showTemp'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => { if (historyDataCache) updateChart(); });
+});
+
+// ============================================
+// Help & Documentation Functions
+// ============================================
+
+/**
+ * Toggle accordion section open/closed
+ */
+function toggleAccordion(headerElement) {
+    const content = headerElement.nextElementSibling;
+    const icon = headerElement.querySelector('.accordion-icon');
+    
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        icon.style.transform = 'rotate(90deg)';
+    } else {
+        content.style.display = 'none';
+        icon.style.transform = 'rotate(0deg)';
+    }
+}
+
+/**
+ * Toggle metric details expand/collapse
+ */
+function toggleMetricDetails(headerElement) {
+    const details = headerElement.nextElementSibling;
+    const expandIcon = headerElement.querySelector('.expand-icon');
+    
+    if (details.style.display === 'none') {
+        details.style.display = 'block';
+        expandIcon.style.transform = 'rotate(180deg)';
+    } else {
+        details.style.display = 'none';
+        expandIcon.style.transform = 'rotate(0deg)';
+    }
+}
+
+/**
+ * Show context help tooltip for grid quality metrics
+ */
+function showHelpTooltip(metricName, event) {
+    const tooltips = {
+        'thd': T('grid.tip.events'),
+        'voltage_sag': T('grid.tip.voltage'),
+        'frequency': T('grid.tip.frequency')
+    };
+    
+    if (!tooltips[metricName]) return;
+    
+    // Create and show tooltip
+    let tooltip = document.getElementById('help-tooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'help-tooltip';
+        tooltip.className = 'help-tooltip';
+        document.body.appendChild(tooltip);
+    }
+    
+    tooltip.textContent = tooltips[metricName];
+    tooltip.style.display = 'block';
+    
+    const rect = event.target.getBoundingClientRect();
+    tooltip.style.position = 'fixed';
+    tooltip.style.top = (rect.bottom + 10) + 'px';
+    tooltip.style.left = (rect.left - tooltip.offsetWidth / 2 + rect.width / 2) + 'px';
+}
+
+/**
+ * Hide context help tooltip
+ */
+function hideHelpTooltip() {
+    const tooltip = document.getElementById('help-tooltip');
+    if (tooltip) tooltip.style.display = 'none';
+}
+
+// Initialisierung beim Seitenaufruf
+// loadUsername() zuerst (setzt _currentRole), dann loadProfiles() (nutzt _currentRole)
+async function init() {
+    await loadUsername();
+    loadProfiles();
+    loadDashboard();
+    loadHistory();
+}
+init();
+setInterval(loadDashboard, 10000);
+setInterval(() => { if (document.getElementById('tab-history').style.display !== 'none') loadHistory(); }, 30000);
+</script>
+
+<!-- Phase 5.5: Events, Policies, Hosts Management -->
+<link rel="stylesheet" href="/static/css/management.css">
+<script src="/static/js/auto-core.js"></script>
+<script src="/static/js/management.js"></script>
+
+<!-- Phase 5.6: Groups Management -->
+<script src="/static/js/groups_management.js"></script>
+<script src="/static/js/auto-header.js"></script>
+<script src="/static/js/auto-help.js"></script>
+<script src="/static/js/auto-countdown.js"></script>
+<script src="/static/js/auto-audit.js"></script>
+<script src="/static/js/auto-battery.js"></script>
+<script src="/static/js/auto-opcua.js"></script>
+<script src="/static/js/auto-services.js"></script>
+<script src="/static/js/auto-targets.js"></script>
+<script src="/static/js/auto-policies.js"></script>
+<script src="/static/js/auto-policy-form.js"></script>
+<script src="/static/js/auto-mail.js"></script>
+<script src="/static/js/solar.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,9 @@
+// Nur nötig für den optionalen Selbst-Shutdown des USV-Servers (Hilfe: „Selbst-Shutdown“).
+// Installation: cp 49-usv-monitor-poweroff.rules /etc/polkit-1/rules.d/
+polkit.addRule(function (action, subject) {
+    if (subject.user === "usv-monitor" &&
+        (action.id === "org.freedesktop.login1.power-off" ||
+         action.id === "org.freedesktop.login1.power-off-multiple-sessions")) {
+        return polkit.Result.YES;
+    }
+});

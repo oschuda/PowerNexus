@@ -1,0 +1,7 @@
+# Entwicklung und Tests
+-r requirements.txt
+pytest
+pytest-asyncio
+aiosmtpd
+pip-audit
+cyclonedx-bom

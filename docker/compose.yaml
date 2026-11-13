@@ -1,0 +1,24 @@
+# Evolved PowerNexus – Docker Compose (Synology: Container Manager → Projekt → Pfad mit dieser Datei)
+#
+# Ordner neben dieser Datei:
+#   src/   Programmcode (Inhalt des Repositorys), daraus wird das Image gebaut
+#   app/   Programmordner im Container: Einstellungen und Daten, gehört in jede Sicherung
+#   .env   USV_SECRET_KEY=<zufällig>, siehe docs/docker.md
+services:
+  powernexus:
+    build: ./src
+    image: evolved-powernexus:latest
+    container_name: powernexus
+    # Host-Netz: upsc erreicht den NUT-Server der Synology als ups@localhost, ohne Freigabe zusätzlicher Adressen
+    network_mode: host
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: Europe/Berlin
+    volumes:
+      - ./app:/opt/usv-monitor
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

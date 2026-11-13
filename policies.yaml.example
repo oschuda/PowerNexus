@@ -1,0 +1,17 @@
+# Beispiel für policies.yaml. Regeln legt man normalerweise im Reiter „Regeln“ an.
+
+policies:
+  - name: "Lage: Server bei Stromausfall herunterfahren"
+    enabled: true
+    dry_run: true                       # Testmodus nur für diese Regel
+    trigger:
+      events: [POWER_FAILURE]
+      scope: {type: group, id: "Lage"}  # all | ups | group
+    conditions: {battery_charge_lt: 60}
+    wait_seconds: 120
+    cancel_on: [POWER_RESTORED]
+    repeat_guard_minutes: 30
+    notify: [it-team]                   # Empfängerlisten aus dem Reiter „E-Mail“
+    steps:                              # nacheinander; innerhalb eines Schritts parallel
+      - {targets: [srv-linux, srv-windows], action: shutdown, timeout_seconds: 180, continue_on_error: true}
+      - {targets: [terra-bmc], action: force_off, delay_seconds: 300}

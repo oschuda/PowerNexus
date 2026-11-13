@@ -1,0 +1,22 @@
+[Unit]
+Description=Evolved PowerNexus (Litestar v22)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=usv-monitor
+Group=usv-monitor
+WorkingDirectory=/opt/usv-monitor
+EnvironmentFile=/etc/usv-monitor/env
+ExecStart=/opt/usv-monitor/.venv/bin/python /opt/usv-monitor/app.py --port 5000
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/usv-monitor /etc/usv-monitor
+
+[Install]
+WantedBy=multi-user.target
